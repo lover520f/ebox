@@ -37,11 +37,26 @@ jobs:
           
           flutter build windows --release
       
+      - name: Verify Build
+        working-directory: ./client
+        run: |
+          if (Test-Path "build\windows\runner\Release\ebox_client.exe") {
+            Write-Host "✅ 构建成功：ebox_client.exe 存在"
+            Get-ChildItem -Path "build\windows\runner\Release" | Format-Table Name, Length
+          } else {
+            Write-Error "❌ 构建失败：ebox_client.exe 不存在"
+            Get-ChildItem -Path "build\windows\runner" -Recurse | Format-Table FullName, Length
+            exit 1
+          }
+      
       - name: Create ZIP
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Compress-Archive -Path "client\build\windows\runner\Release\*" `
             -DestinationPath "dist/ebox-${{ github.event.inputs.version }}-portable.zip" -Force
+          
+          $zipSize = (Get-Item "dist/ebox-${{ github.event.inputs.version }}-portable.zip").Length / 1MB
+          Write-Host "📦 便携版大小：{0:F2} MB" -f $zipSize
       
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
