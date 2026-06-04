@@ -61,12 +61,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
+
   assets:
     - assets/images/.gitkeep
     - assets/fonts/.gitkeep
-  
-  fonts:
-    - family: HillsIcons
-      fonts:
-        - asset: assets/fonts/icons.ttf
