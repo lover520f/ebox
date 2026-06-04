@@ -7,6 +7,8 @@ import '../../providers/media_provider.dart';
 import '../../providers/server_provider.dart';
 import '../../models/media_item.dart';
 import '../../widgets/media_card.dart';
+import '../../widgets/loading_widget.dart';
+import '../../widgets/error_widget.dart';
 
 class LibraryPage extends StatefulWidget {
   final String libraryId;
@@ -37,6 +39,7 @@ class _LibraryPageState extends State<LibraryPage> {
     final mediaProvider = context.watch<MediaProvider>();
     final items = mediaProvider.itemsByLibrary[widget.libraryId] ?? [];
     final isLoading = mediaProvider.isLoading;
+    final error = mediaProvider.error;
 
     return Scaffold(
       appBar: AppBar(
@@ -102,10 +105,41 @@ class _LibraryPageState extends State<LibraryPage> {
         ],
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : items.isEmpty
-              ? _buildEmptyState()
-              : _buildContent(items),
+          ? _buildLoadingState()
+          : error != null
+              ? _buildErrorState(error)
+              : items.isEmpty
+                  ? _buildEmptyState()
+                  : _buildContent(items),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    if (_viewMode == 'list') {
+      return ListView.builder(
+        itemCount: 10,
+        itemBuilder: (context, index) => const ListItemLoadingWidget(),
+      );
+    } else {
+      return GridView.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _gridColumns,
+          childAspectRatio: 2 / 3,
+          crossAxisSpacing: AppTheme.spacingM,
+          mainAxisSpacing: AppTheme.spacingM,
+        ),
+        itemCount: _gridColumns * 3,
+        itemBuilder: (context, index) => const PosterLoadingWidget(),
+      );
+    }
+  }
+
+  Widget _buildErrorState(String error) {
+    return ErrorWidget(
+      message: '加载失败',
+      hint: error,
+      icon: Icons.cloud_off_outlined,
+      onRetry: _loadItems,
     );
   }
 
