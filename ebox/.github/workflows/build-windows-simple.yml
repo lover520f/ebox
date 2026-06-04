@@ -1,0 +1,43 @@
+name: Build Windows Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如 v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+      
+      - name: Build Windows
+        working-directory: ./client
+        run: |
+          flutter pub get
+          flutter build windows --release
+      
+      - name: Create ZIP
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "client\build\windows\runner\Release\*" `
+            -DestinationPath "dist/ebox-${{ github.event.inputs.version }}-portable.zip" -Force
+      
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: E 宝盒 ${{ github.event.inputs.version }}
+          files: dist/ebox-${{ github.event.inputs.version }}-portable.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
