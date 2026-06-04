@@ -1,0 +1,116 @@
+name: Windows Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如 v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: 获取版本标签
+        id: get_version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: 设置 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+      
+      - name: 检查 Flutter 环境
+        run: |
+          flutter --version
+          flutter doctor -v
+      
+      - name: 安装依赖
+        working-directory: ./client
+        run: flutter pub get
+      
+      - name: 构建 Windows Release
+        working-directory: ./client
+        run: flutter build windows --release
+      
+      - name: 验证构建
+        run: |
+          if (Test-Path "client\build\windows\runner\Release\ebox_client.exe") {
+            Write-Host "✅ 构建成功"
+          } else {
+            Write-Error "❌ 构建失败"
+            exit 1
+          }
+      
+      - name: 创建发布目录
+        run: |
+          New-Item -ItemType Directory -Force -Path "client/dist" | Out-Null
+      
+      - name: 创建便携版 (ZIP)
+        run: |
+          Compress-Archive -Path "client\build\windows\runner\Release\*" `
+            -DestinationPath "client\dist\ebox-${{ steps.get_version.outputs.VERSION }}-portable.zip" `
+            -Force
+          
+          $zipSize = (Get-Item "client\dist\ebox-${{ steps.get_version.outputs.VERSION }}-portable.zip").Length / 1MB
+          Write-Host "📦 便携版大小：{0:F2} MB" -f $zipSize
+      
+      - name: 创建安装版 (需要 Inno Setup - 暂时跳过)
+        run: |
+          Write-Host "💡 提示：安装版需要 Inno Setup，当前工作流仅生成便携版"
+          Write-Host "   可手动下载便携版使用，或本地创建安装版后上传"
+      
+      - name: 列出构建文件
+        run: |
+          Get-ChildItem -Path "client\dist" | Format-Table Name, Length
+      
+      - name: 上传便携版到 Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ebox-portable
+          path: client/dist/ebox-${{ steps.get_version.outputs.VERSION }}-portable.zip
+          retention-days: 30
+      
+      - name: 创建/更新 GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: E 宝盒 ${{ steps.get_version.outputs.VERSION }}
+          body_path: client/RELEASE_NOTES_${{ steps.get_version.outputs.VERSION }}.md
+          files: |
+            client/dist/ebox-${{ steps.get_version.outputs.VERSION }}-portable.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 发布完成
+        run: |
+          Write-Host ""
+          Write-Host "==================================" -ForegroundColor Green
+          Write-Host "🎉 E 宝盒 ${{ steps.get_version.outputs.VERSION }} 发布成功！" -ForegroundColor Green
+          Write-Host "==================================" -ForegroundColor Green
+          Write-Host ""
+          Write-Host "📦 便携版已上传到 GitHub Release"
+          Write-Host ""
+          Write-Host "下载地址："
+          Write-Host "https://github.com/love520f/ebox/releases/tag/${{ steps.get_version.outputs.VERSION }}"
+          Write-Host ""
