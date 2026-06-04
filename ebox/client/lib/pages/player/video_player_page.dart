@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../config/theme.dart';
-import '../../providers/player_provider.dart';
+import '../../services/video_player_service.dart';
 import '../../providers/server_provider.dart';
 
 class VideoPlayerPage extends StatefulWidget {
   final String itemId;
   final String serverId;
+  final String? videoUrl;
 
   const VideoPlayerPage({
     super.key,
     required this.itemId,
     required this.serverId,
+    this.videoUrl,
   });
 
   @override
@@ -21,13 +24,10 @@ class VideoPlayerPage extends StatefulWidget {
 }
 
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
-  bool _isPlaying = false;
+  late VideoPlayerService _playerService;
   bool _showControls = true;
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  double _volume = 1.0;
-  bool _isMuted = false;
-  double _playbackSpeed = 1.0;
+  bool _isBuffering = true;
+  String? _errorMessage;
   
   DateTime _lastInteractionTime = DateTime.now();
   Timer? _controlsTimer;
@@ -35,23 +35,46 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   @override
   void initState() {
     super.initState();
+    _playerService = VideoPlayerService();
     _initializePlayer();
   }
 
-  void _initializePlayer() {
-    // TODO: 初始化视频播放器
-    // 这里会集成 video_player 或 fijkplayer
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 模拟加载
+  void _initializePlayer() async {
+    try {
+      setState(() => _isBuffering = true);
+      
+      final serverProvider = context.read<ServerProvider>();
+      final apiClient = serverProvider.apiClient;
+      
+      String videoUrl = widget.videoUrl ?? '';
+      
+      // 如果没有传入 videoUrl，从 Emby 获取
+      if (videoUrl.isEmpty) {
+        videoUrl = await apiClient.getPlaybackUrl(widget.itemId);
+      }
+      
+      // 初始化播放器
+      await _playerService.initialize(videoUrl);
+      
       setState(() {
-        _duration = const Duration(hours: 1, minutes: 30);
+        _isBuffering = false;
       });
-    });
+      
+      // 自动开始播放
+      _playerService.play();
+      
+    } catch (e) {
+      setState(() {
+        _isBuffering = false;
+        _errorMessage = '视频加载失败：$e';
+      });
+    }
   }
 
   @override
   void dispose() {
     _controlsTimer?.cancel();
+    _playerService.dispose();
     super.dispose();
   }
 
@@ -61,7 +84,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     
     _controlsTimer?.cancel();
     _controlsTimer = Timer(const Duration(seconds: 3), () {
-      if (_isPlaying && mounted) {
+      if (_playerService.isPlaying && mounted) {
         setState(() => _showControls = false);
       }
     });
@@ -70,25 +93,23 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 视频区域 (占位)
+          // 视频区域
           buildVideoArea(),
           
+          // 缓冲指示器
+          if (_isBuffering) buildBufferingIndicator(),
+          
+          // 错误信息
+          if (_errorMessage != null) buildErrorWidget(),
+          
           // 顶部控制栏
-          if (_showControls) buildTopBar(),
+          if (_showControls && _errorMessage == null) buildTopBar(),
           
           // 底部控制栏
-          if (_showControls) buildBottomBar(),
-          
-          // 中央播放/暂停按钮
-          if (!_showControls && _isPlaying)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: _showControlsTemporarily,
-                child: Container(),
-              ),
-            ),
+          if (_showControls && _errorMessage == null) buildBottomBar(),
         ],
       ),
     );
@@ -97,39 +118,81 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Widget buildVideoArea() {
     return GestureDetector(
       onTap: _showControlsTemporarily,
-      onDoubleTap: _togglePlayPause,
-      child: Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: Colors.black,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // 播放图标 (占位)
-              Icon(
-                _isPlaying ? Icons.play_arrow : Icons.pause,
-                size: 100,
-                color: Colors.white.withOpacity(0.5),
+      onDoubleTap: () {
+        final screenState = _playerService.isPlaying ? _playerService.position.inSeconds : 0;
+        if (screenState < 5) {
+          _playerService.rewind(const Duration(seconds: 10));
+        } else {
+          _playerService.forward(const Duration(seconds: 10));
+        }
+      },
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: _playerService.controller?.value.aspectRatio ?? 16 / 9,
+          child: VideoPlayer(_playerService.controller!),
+        ),
+      ),
+    );
+  }
+
+  Widget buildBufferingIndicator() {
+    return Container(
+      color: Colors.black.withOpacity(0.7),
+      child: const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 16),
+            Text(
+              '正在加载...',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
               ),
-              const SizedBox(height: AppTheme.spacingM),
-              const Text(
-                '视频播放器开发中',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 18,
-                ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget buildErrorWidget() {
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage!,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
               ),
-              const SizedBox(height: AppTheme.spacingS),
-              Text(
-                'Item ID: ${widget.itemId}',
-                style: const TextStyle(
-                  color: Colors.white54,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                _initializePlayer();
+              },
+              child: const Text('重试'),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () {
+                context.pop();
+              },
+              child: const Text('返回'),
+            ),
+          ],
         ),
       ),
     );
@@ -151,10 +214,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             },
           ),
           const SizedBox(width: AppTheme.spacingM),
-          const Expanded(
+          Expanded(
             child: Text(
               '视频播放',
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -168,13 +231,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () {
               _showSettingsMenu();
-            },
-          ),
-          const SizedBox(width: AppTheme.spacingS),
-          IconButton(
-            icon: const Icon(Icons.fullscreen, color: Colors.white),
-            onPressed: () {
-              // TODO: 切换全屏
             },
           ),
         ],
@@ -213,25 +269,28 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               IconButton(
                 icon: const Icon(Icons.replay_10, color: Colors.white, size: 32),
                 onPressed: () {
-                  _seekBackward();
+                  _playerService.rewind(const Duration(seconds: 10));
                 },
                 iconSize: 32,
               ),
               // 播放/暂停
               IconButton(
                 icon: Icon(
-                  _isPlaying ? Icons.pause_circle : Icons.play_circle,
+                  _playerService.isPlaying ? Icons.pause_circle : Icons.play_circle,
                   color: Colors.white,
                   size: 48,
                 ),
-                onPressed: _togglePlayPause,
+                onPressed: () {
+                  _playerService.togglePlayPause();
+                  _showControlsTemporarily();
+                },
                 iconSize: 48,
               ),
               // 快进 10 秒
               IconButton(
                 icon: const Icon(Icons.forward_10, color: Colors.white, size: 32),
                 onPressed: () {
-                  _seekForward();
+                  _playerService.forward(const Duration(seconds: 10));
                 },
                 iconSize: 32,
               ),
@@ -247,22 +306,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 children: [
                   IconButton(
                     icon: Icon(
-                      _isMuted ? Icons.volume_off : Icons.volume_up,
+                      _playerService.isMuted ? Icons.volume_off : Icons.volume_up,
                       color: Colors.white,
                     ),
                     onPressed: () {
-                      setState(() => _isMuted = !_isMuted);
+                      _playerService.toggleMute();
                     },
                   ),
                   SizedBox(
                     width: 80,
                     child: Slider(
-                      value: _isMuted ? 0 : _volume,
+                      value: _playerService.volume,
                       onChanged: (value) {
-                        setState(() {
-                          _volume = value;
-                          _isMuted = value == 0;
-                        });
+                        _playerService.setVolume(value);
                       },
                       activeColor: Colors.white,
                     ),
@@ -273,7 +329,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               TextButton(
                 onPressed: _showSpeedMenu,
                 child: Text(
-                  '${_playbackSpeed}x',
+                  '${_playerService.speed}x',
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
@@ -282,7 +338,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 icon: const Icon(Icons.subtitles, color: Colors.white),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('字幕功能开发中...')),
+                    const SnackBar(content: Text('字幕功能请稍后使用...')),
                   );
                 },
               ),
@@ -307,7 +363,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     return Row(
       children: [
         Text(
-          _formatDuration(_position),
+          _formatDuration(_playerService.position),
           style: const TextStyle(color: Colors.white, fontSize: 12),
         ),
         const SizedBox(width: AppTheme.spacingS),
@@ -320,62 +376,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               trackHeight: 4,
             ),
             child: Slider(
-              value: _position.inSeconds.toDouble(),
-              max: _duration.inSeconds.toDouble() > 0 
-                  ? _duration.inSeconds.toDouble() 
+              value: _playerService.position.inSeconds.toDouble(),
+              max: _playerService.duration.inSeconds.toDouble() > 0 
+                  ? _playerService.duration.inSeconds.toDouble() 
                   : 1,
               onChanged: (value) {
-                setState(() {
-                  _position = Duration(seconds: value.toInt());
-                });
-              },
-              onChangeEnd: (value) {
-                _seekTo(Duration(seconds: value.toInt()));
+                _playerService.seekTo(Duration(seconds: value.toInt()));
+                setState(() {});
               },
             ),
           ),
         ),
         const SizedBox(width: AppTheme.spacingS),
         Text(
-          _formatDuration(_duration),
+          _formatDuration(_playerService.duration),
           style: const TextStyle(color: Colors.white, fontSize: 12),
         ),
       ],
     );
-  }
-
-  void _togglePlayPause() {
-    setState(() {
-      _isPlaying = !_isPlaying;
-    });
-    if (_isPlaying) {
-      _showControlsTemporarily();
-    }
-  }
-
-  void _seekBackward() {
-    final newPosition = _position - const Duration(seconds: 10);
-    if (newPosition.inSeconds < 0) {
-      _seekTo(Duration.zero);
-    } else {
-      _seekTo(newPosition);
-    }
-  }
-
-  void _seekForward() {
-    final newPosition = _position + const Duration(seconds: 10);
-    if (newPosition.inSeconds > _duration.inSeconds) {
-      _seekTo(_duration);
-    } else {
-      _seekTo(newPosition);
-    }
-  }
-
-  void _seekTo(Duration position) {
-    setState(() {
-      _position = position;
-    });
-    // TODO: 实际播放器 seek 操作
   }
 
   String _formatDuration(Duration duration) {
@@ -412,18 +430,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             ListTile(
               leading: const Icon(Icons.subtitles),
               title: const Text('字幕'),
-              subtitle: const Text('未加载'),
+              subtitle: const Text('自动'),
               onTap: () {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('字幕选择功能开发中...')),
+                  const SnackBar(content: Text('字幕功能开发中...')),
                 );
               },
             ),
             ListTile(
               leading: const Icon(Icons.speed),
               title: const Text('播放速度'),
-              subtitle: Text('${_playbackSpeed}x'),
+              subtitle: Text('${_playerService.speed}x'),
               onTap: () {
                 Navigator.pop(context);
                 _showSpeedMenu();
@@ -454,14 +472,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             ...const [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((speed) {
               return ListTile(
                 leading: Icon(
-                  _playbackSpeed == speed ? Icons.check : Icons.speed,
-                  color: _playbackSpeed == speed 
+                  _playerService.speed == speed 
+                      ? Icons.check 
+                      : Icons.speed,
+                  color: _playerService.speed == speed 
                       ? AppTheme.primaryColor 
                       : null,
                 ),
                 title: Text('${speed}x'),
                 onTap: () {
-                  setState(() => _playbackSpeed = speed);
+                  _playerService.setSpeed(speed);
                   Navigator.pop(context);
                 },
               );
