@@ -79,91 +79,76 @@ class ServerListPage extends StatelessWidget {
         final server = servers[index];
         return Card(
           margin: const EdgeInsets.only(bottom: AppTheme.spacingM),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(AppTheme.spacingM),
-            leading: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: server.isActive
-                    ? const LinearGradient(colors: AppTheme.gradientColors)
-                    : null,
-                color: server.isActive ? null : AppTheme.cardColor,
-                borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-              ),
-              child: Icon(
-                server.isActive ? Icons.cloud_done : Icons.cloud_off,
-                color: Colors.white,
-              ),
-            ),
-            title: Text(
-              server.name,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: AppTheme.spacingXS),
-                Text(
-                  server.url,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                if (server.username != null) ...[
-                  const SizedBox(height: AppTheme.spacingXS),
-                  Text(
-                    '用户：${server.username}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
+          child: InkWell(
+            onTap: () async {
+              // 点击卡片直接连接服务器
+              final provider = context.read<ServerProvider>();
+              final success = await provider.connectToServer(server.id);
+              if (success && context.mounted) {
+                // 连接成功后跳转到首页
+                context.goNamed('home');
+              }
+            },
+            borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.spacingM),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: server.isActive
+                          ? const LinearGradient(colors: AppTheme.gradientColors)
+                          : null,
+                      color: server.isActive ? null : AppTheme.cardColor,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                    ),
+                    child: Icon(
+                      server.isActive ? Icons.cloud_done : Icons.cloud_off,
+                      color: Colors.white,
+                      size: 32,
                     ),
                   ),
+                  const SizedBox(width: AppTheme.spacingM),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          server.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: AppTheme.spacingXS),
+                        Text(
+                          server.url,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                        if (server.username != null) ...[
+                          const SizedBox(height: AppTheme.spacingXS),
+                          Text(
+                            '用户：${server.username}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (server.isActive)
+                    const Icon(Icons.check_circle, color: AppTheme.successColor)
+                  else
+                    const Icon(Icons.arrow_forward_ios, color: AppTheme.textSecondary),
                 ],
-              ],
-            ),
-            trailing: PopupMenuButton<String>(
-              onSelected: (value) async {
-                final provider = context.read<ServerProvider>();
-                switch (value) {
-                  case 'connect':
-                    await provider.connectToServer(server.id);
-                    break;
-                  case 'edit':
-                    // TODO: 编辑服务器
-                    break;
-                  case 'delete':
-                    _showDeleteDialog(context, server);
-                    break;
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'connect',
-                  child: ListTile(
-                    leading: Icon(Icons.link),
-                    title: Text('连接'),
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: ListTile(
-                    leading: Icon(Icons.edit),
-                    title: Text('编辑'),
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: ListTile(
-                    leading: Icon(Icons.delete, color: AppTheme.errorColor),
-                    title: Text('删除', style: TextStyle(color: AppTheme.errorColor)),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );

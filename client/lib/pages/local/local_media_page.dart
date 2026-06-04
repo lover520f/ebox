@@ -26,6 +26,12 @@ class _LocalMediaPageState extends State<LocalMediaPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            context.pop();
+          },
+        ),
         title: const Text('本地媒体'),
         actions: [
           IconButton(

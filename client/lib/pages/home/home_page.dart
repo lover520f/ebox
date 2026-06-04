@@ -17,9 +17,21 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // 加载媒体库
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MediaProvider>().loadLibraries();
+    // 延迟加载以确保 ServerProvider 已初始化
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // 等待一下确保 ServerProvider 已经加载完成
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (mounted) {
+        final mediaProvider = context.read<MediaProvider>();
+        final serverProvider = context.read<ServerProvider>();
+        // 传递 serverProvider 引用给 MediaProvider
+        await mediaProvider.loadLibraries();
+        
+        // 如果已经有活跃的服务器，重新设置 apiClient
+        if (serverProvider.isAuthenticated) {
+          mediaProvider._apiClient = serverProvider.apiClient;
+        }
+      }
     });
   }
 

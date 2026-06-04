@@ -63,6 +63,29 @@ class MediaCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // 播放按钮
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.play_arrow, color: Colors.white, size: 24),
+                        onPressed: () {
+                          // 直接播放
+                          context.goNamed('player', queryParameters: {
+                            'itemId': item.id,
+                            'serverId': serverProvider.activeServer?.id ?? '',
+                          });
+                        },
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

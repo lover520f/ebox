@@ -87,6 +87,12 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
         slivers: [
           // 背景海报
           SliverAppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                context.pop();
+              },
+            ),
             expandedHeight: 400,
             pinned: true,
             stretch: true,

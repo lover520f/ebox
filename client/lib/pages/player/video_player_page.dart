@@ -98,21 +98,31 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       body: Stack(
         children: [
           // 视频区域
-          buildVideoArea(),
-          
-          // 缓冲指示器
-          if (_isBuffering) buildBufferingIndicator(),
-          
-          // 错误信息
-          if (_errorMessage != null) buildErrorWidget(),
-          
-          // 顶部控制栏
-          if (_showControls && _errorMessage == null) buildTopBar(),
-          
-          // 底部控制栏
-          if (_showControls && _errorMessage == null) buildBottomBar(),
-        ],
-      ),
+          Positioned.fill(
+            child: Center(
+              child: _playerService.isVideoInitialized
+                  ? AspectRatio(
+                      aspectRatio: _playerService.controller.value.aspectRatio,
+                      child: VideoPlayer(_playerService.controller),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ),
+          // 返回按钮（始终显示在顶层）
+          Positioned(
+            top: MediaQuery.of(context).padding.top,
+            left: 16,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 32),
+              onPressed: () {
+                context.pop();
+              },
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.black54,
+                padding: const EdgeInsets.all(12),
+              ),
+            ),
+          ),
     );
   }
 

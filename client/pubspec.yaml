@@ -1,7 +1,7 @@
 name: ebox_client
 description: E 宝盒 - 跨平台媒体中心客户端 (支持 Emby/本地媒体)
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
