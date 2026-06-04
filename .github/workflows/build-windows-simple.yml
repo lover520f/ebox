@@ -83,6 +83,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           name: E 宝盒 ${{ github.event.inputs.version }}
+          tag_name: ${{ github.event.inputs.version }}
           files: dist/ebox-${{ github.event.inputs.version }}-portable.zip
           generate_release_notes: true
         env:
