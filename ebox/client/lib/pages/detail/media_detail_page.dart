@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../config/theme.dart';
 import '../../models/media_item.dart';
 import '../../providers/media_provider.dart';
+import '../../providers/server_provider.dart';
 
 class MediaDetailPage extends StatefulWidget {
   final String mediaId;
@@ -60,6 +62,14 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
       );
     }
 
+    final serverProvider = context.watch<ServerProvider>();
+    final serverUrl = serverProvider.activeServer?.url;
+    
+    String? backdropUrl;
+    if (serverUrl != null && _mediaItem!.imageTags?.containsKey('Backdrop') == true) {
+      backdropUrl = '$serverUrl/Items/${_mediaItem!.id}/Images/Backdrop?tag=${_mediaItem!.imageTags!['Backdrop']}';
+    }
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -72,26 +82,27 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
               background: Stack(
                 fill: true,
                 children: [
-                  // 背景图
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppTheme.primaryColor.withOpacity(0.3),
-                          AppTheme.backgroundColor,
-                        ],
+                  // 使用网络图片
+                  if (backdropUrl != null)
+                    CachedNetworkImage(
+                      imageUrl: backdropUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AppTheme.primaryColor.withOpacity(0.3),
+                              AppTheme.backgroundColor,
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        _getIconForType(_mediaItem!.type),
-                        size: 120,
-                        color: AppTheme.textSecondary.withOpacity(0.3),
-                      ),
-                    ),
-                  ),
+                      errorWidget: (context, url, error) => _buildPlaceholder(),
+                    )
+                  else
+                    _buildPlaceholder(),
                   // 渐变遮罩
                   Container(
                     decoration: BoxDecoration(
@@ -348,5 +359,27 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
       default:
         return Icons.theater_comedy;
     }
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppTheme.primaryColor.withOpacity(0.3),
+            AppTheme.backgroundColor,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          _getIconForType(_mediaItem!.type),
+          size: 120,
+          color: AppTheme.textSecondary.withOpacity(0.3),
+        ),
+      ),
+    );
   }
 }

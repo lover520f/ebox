@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../config/theme.dart';
 import '../../models/media_item.dart';
+import '../../providers/server_provider.dart';
 
 class MediaCard extends StatelessWidget {
   final MediaItem item;
@@ -11,6 +13,15 @@ class MediaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final serverProvider = context.watch<ServerProvider>();
+    final serverUrl = serverProvider.activeServer?.url;
+    
+    // 构建图片 URL
+    String? imageUrl;
+    if (serverUrl != null && item.imageTags?.containsKey('Primary') == true) {
+      imageUrl = '$serverUrl/Items/${item.id}/Images/Primary?tag=${item.imageTags!['Primary']}';
+    }
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -25,18 +36,20 @@ class MediaCard extends StatelessWidget {
               child: Stack(
                 fill: true,
                 children: [
-                  // 背景色
-                  Container(
-                    color: AppTheme.cardColor,
-                  ),
-                  // 封面图 (使用占位图，实际使用时替换为网络图片)
-                  Center(
-                    child: Icon(
-                      _getIconForType(item.type),
-                      size: 48,
-                      color: AppTheme.textSecondary.withOpacity(0.5),
-                    ),
-                  ),
+                  // 网络图片或占位图
+                  imageUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: AppTheme.cardColor,
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => _buildPlaceholder(),
+                        )
+                      : _buildPlaceholder(),
                   // 渐变遮罩
                   Container(
                     decoration: BoxDecoration(
@@ -109,22 +122,16 @@ class MediaCard extends StatelessWidget {
     );
   }
 
-  IconData _getIconForType(String type) {
-    switch (type) {
-      case 'Movie':
-        return Icons.movie;
-      case 'Series':
-        return Icons.tv;
-      case 'Episode':
-        return Icons.slideshow;
-      case 'Season':
-        return Icons.folder;
-      case 'Audio':
-        return Icons.music_note;
-      case 'Book':
-        return Icons.book;
-      default:
-        return Icons.theater_comedy;
-    }
+  Widget _buildPlaceholder() {
+    return Container(
+      color: AppTheme.cardColor,
+      child: Center(
+        child: Icon(
+          Icons.movie,
+          size: 48,
+          color: AppTheme.textSecondary.withOpacity(0.5),
+        ),
+      ),
+    );
   }
 }
