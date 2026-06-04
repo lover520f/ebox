@@ -14,12 +14,30 @@ jobs:
     
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.x'
           channel: 'stable'
+      
+      - name: Create and Push Tag
+        run: |
+          $VERSION = "${{ github.event.inputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 删除已存在的 tag
+          git tag -d $VERSION -ErrorAction SilentlyContinue
+          git push origin :refs/tags/$VERSION -ErrorAction SilentlyContinue
+          
+          # 创建并推送新 tag
+          git tag $VERSION
+          git push origin $VERSION
+          
+          Write-Host "已创建并推送 tag: $VERSION"
       
       - name: Enable Windows Support
         working-directory: ./client
