@@ -40,11 +40,15 @@ jobs:
       - name: Verify Build
         working-directory: ./client
         run: |
-          if (Test-Path "build\windows\runner\Release\ebox_client.exe") {
+          # 检查两种可能的文件名
+          if (Test-Path "build\windows\runner\Release\client.exe") {
+            Write-Host "✅ 构建成功：client.exe 存在"
+            Get-ChildItem -Path "build\windows\runner\Release" | Format-Table Name, Length
+          } elseif (Test-Path "build\windows\runner\Release\ebox_client.exe") {
             Write-Host "✅ 构建成功：ebox_client.exe 存在"
             Get-ChildItem -Path "build\windows\runner\Release" | Format-Table Name, Length
           } else {
-            Write-Error "❌ 构建失败：ebox_client.exe 不存在"
+            Write-Error "❌ 构建失败：exe 文件不存在"
             Get-ChildItem -Path "build\windows\runner" -Recurse | Format-Table FullName, Length
             exit 1
           }
