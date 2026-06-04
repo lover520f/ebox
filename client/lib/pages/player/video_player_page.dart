@@ -100,10 +100,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           // 视频区域
           Positioned.fill(
             child: Center(
-              child: _playerService.isVideoInitialized
+              child: _playerService.isInitialized
                   ? AspectRatio(
-                      aspectRatio: _playerService.controller.value.aspectRatio,
-                      child: VideoPlayer(_playerService.controller),
+                      aspectRatio: _playerService.controller!.value.aspectRatio,
+                      child: VideoPlayer(_playerService.controller!),
                     )
                   : const SizedBox.shrink(),
             ),
@@ -123,6 +123,26 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               ),
             ),
           ),
+          // 错误提示
+          if (_errorMessage != null)
+            Positioned(
+              top: 100,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 

@@ -20,29 +20,22 @@ class MediaProvider extends ChangeNotifier {
   MediaProvider();
 
   // 加载媒体库列表
-  Future<void> loadLibraries([BuildListenerProviderRef<ServerProvider>? serverProviderRef]) async {
+  Future<void> loadLibraries() async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      // 从传入的 provider 获取 API 客户端，如果没传入则创建临时实例
-      if (serverProviderRef != null) {
-        final serverProvider = serverProviderRef.read();
-        _apiClient = serverProvider.apiClient;
-        
-        if (!serverProvider.isAuthenticated) {
-          _error = '未连接到服务器';
-          _isLoading = false;
-          notifyListeners();
-          return;
-        }
-      } else {
-        // 临时创建（兼容旧代码）
-        final tempServerProvider = ServerProvider();
-        _apiClient = tempServerProvider.apiClient;
-      }
+      final serverProvider = ServerProvider();
+      _apiClient = serverProvider.apiClient;
       
+      if (!serverProvider.isAuthenticated) {
+        _error = '未连接到服务器';
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+
       _libraries = await _apiClient!.getLibraries();
       
       _isLoading = false;
