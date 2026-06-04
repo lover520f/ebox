@@ -40,23 +40,23 @@ jobs:
       - name: Verify Build
         working-directory: ./client
         run: |
-          # 检查两种可能的文件名
-          if (Test-Path "build\windows\runner\Release\client.exe") {
+          # 检查两种可能的文件名（注意 x64 目录）
+          if (Test-Path "build\windows\x64\runner\Release\client.exe") {
             Write-Host "✅ 构建成功：client.exe 存在"
-            Get-ChildItem -Path "build\windows\runner\Release" | Format-Table Name, Length
-          } elseif (Test-Path "build\windows\runner\Release\ebox_client.exe") {
-            Write-Host "✅ 构建成功：ebox_client.exe 存在"
+            Get-ChildItem -Path "build\windows\x64\runner\Release" | Format-Table Name, Length
+          } elseif (Test-Path "build\windows\runner\Release\client.exe") {
+            Write-Host "✅ 构建成功：client.exe 存在"
             Get-ChildItem -Path "build\windows\runner\Release" | Format-Table Name, Length
           } else {
             Write-Error "❌ 构建失败：exe 文件不存在"
-            Get-ChildItem -Path "build\windows\runner" -Recurse | Format-Table FullName, Length
+            Get-ChildItem -Path "build\windows" -Recurse -Filter "*.exe" | Format-Table FullName, Length
             exit 1
           }
       
       - name: Create ZIP
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Compress-Archive -Path "client\build\windows\runner\Release\*" `
+          Compress-Archive -Path "client\build\windows\x64\runner\Release\*" `
             -DestinationPath "dist/ebox-${{ github.event.inputs.version }}-portable.zip" -Force
           
           $zipSize = (Get-Item "dist/ebox-${{ github.event.inputs.version }}-portable.zip").Length / 1MB
