@@ -1,152 +1,228 @@
-# E 宝盒 (ebox) - 给完全不懂代码的用户的实施指南
+# E 宝盒 (ebox)
 
-## 📋 项目说明
+> 跨平台媒体中心应用 - 支持 Emby 服务器和本地媒体播放
 
-我已经为你设计并开始开发一款名为**E 宝盒 (ebox)** 的跨平台影视软件，功能类似 Emby 客户端，但界面完全模仿 Hills 播放器的精美设计。
+[![GitHub release](https://img.shields.io/github/release/lover520f/ebox.svg)](https://github.com/lover520f/ebox/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20iOS-blue)](https://github.com/lover520f/ebox)
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-blue)](https://flutter.dev)
+[![License](https://img.shields.io/github/license/lover520f/ebox.svg)](LICENSE)
 
-### 核心功能
-✅ 连接 Emby 服务器观影  
-✅ 本地视频播放  
-✅ 支持电影、电视剧分类  
-✅ 精美的海报墙界面  
-✅ 播放进度记忆  
-✅ 支持字幕、倍速播放  
+## 🎨 产品特色
 
-### 支持平台
-- ✅ Windows 电脑 (第一阶段 - 当前)
-- ⏳ Android 手机 (第二阶段)
-- ⏳ Android TV 电视 (第三阶段)
-- ⏳ iPhone/iPad (第三阶段)
+### 精美设计
+- Hills 风格深色主题
+- 紫蓝色渐变点缀
+- 流畅的交互动画
+- 响应式布局
 
-## 🎯 你目前的位置
+### 强大功能
+- ✅ 连接 Emby 媒体服务器
+- ✅ 本地视频播放
+- ✅ 播放进度记忆
+- ✅ 倍速播放
+- ✅ 字幕支持（开发中）
+- ✅ 画质选择（开发中）
 
-**第一阶段 MVP 开发中** - 已完成基础架构和核心服务，剩余页面开发中。
+### 跨平台支持
+- 💻 Windows 10/11
+- 📱 Android (即将推出)
+- 📱 iOS (即将推出)
+- 📺 Android TV (规划中)
 
-## 📦 你需要做的事情 (按顺序)
+## 📥 下载安装
 
-### 第 1 步：安装必要软件
+### Windows
 
-#### 1.1 安装 Git
-下载地址：https://git-scm.com/download/win
-- 下载安装包
-- 双击运行
-- 全部默认选项即可
+1. 访问 [Releases](https://github.com/lover520f/ebox/releases)
+2. 下载最新版本 `ebox-v1.0.0-windows.zip`
+3. 解压到任意目录
+4. 双击运行 `ebox_client.exe`
 
-#### 1.2 安装 Flutter SDK
-下载地址：https://docs.flutter.dev/get-started/install/windows
+**系统要求:**
+- Windows 10 64 位及以上
+- 4GB+ RAM
+- 500MB 可用存储空间
 
-**安装步骤:**
-1. 下载 Flutter Windows 安装包
-2. 解压到 `C:\src\flutter` (或其他路径)
-3. 添加 Flutter 到系统环境变量：
-   - 右键"此电脑" → "属性" → "高级系统设置"
-   - "环境变量" → 找到"Path"
-   - 编辑 → 新建 → 添加 `C:\src\flutter\bin`
-   - 确定保存
+## 🚀 快速开始
 
-4. 验证安装：
-   打开命令提示符，输入：
-   ```
-   flutter --version
-   ```
+### 1. 连接 Emby 服务器
 
-#### 1.3 安装 Android Studio (可选，用于 Android 开发)
-如果只需要 Windows 版本，可以跳过这一步。
+1. 启动 E 宝盒
+2. 点击"开始使用"
+3. 点击"添加服务器"（右上角 + 号）
+4. 填写服务器信息:
+   - 服务器地址：`http://IP 地址：8096`
+   - 服务器名称：（可选）
+   - 用户名/密码：（如果有）
+5. 点击"测试连接"
+6. 保存并连接
 
-#### 1.4 安装 Visual Studio (用于 Windows 开发)
-下载 Visual Studio 2022 Community Edition:
-https://visualstudio.microsoft.com/
+### 2. 浏览媒体库
 
-安装时勾选：
-- "使用 C++ 的桌面开发"
+1. 在主页点击任意媒体库
+2. 浏览电影/电视剧海报墙
+3. 点击海报查看详情
+4. 点击"播放"开始观看
 
-### 第 2 步：获取项目代码
+### 3. 播放本地视频
 
-打开命令提示符，执行：
+1. 底部导航栏点击"本地"
+2. 选择包含视频的文件夹
+3. 自动扫描视频文件
+4. 点击任意视频播放
+
+## 🛠️ 开发指南
+
+### 环境要求
+
+- Flutter SDK 3.x
+- Dart 3.x
+- Visual Studio 2022 (Windows)
+- Android Studio (Android)
+- Xcode (iOS)
+
+### 克隆项目
 
 ```bash
-cd C:\Users\你的用户名\Desktop
-git clone https://github.com/你的账号/ebox.git
+git clone https://github.com/lover520f/ebox.git
+cd ebox/client
 ```
 
-或者，如果你还没有创建 GitHub 仓库，我可以帮你配置本地项目。
-
-### 第 3 步：安装依赖
+### 安装依赖
 
 ```bash
-cd ebox/client
 flutter pub get
 ```
 
-### 第 4 步：运行应用
+### 运行应用
 
 ```bash
+# Windows
 flutter run -d windows
+
+# Android
+flutter run -d android
+
+# macOS
+flutter run -d macos
 ```
 
-如果一切正常，你会看到 E 宝盒应用启动！
-
-### 第 5 步：打包成可执行文件
+### 打包发布
 
 ```bash
+# Windows
 flutter build windows --release
+
+# Android APK
+flutter build apk --release
+
+# iOS
+flutter build ios --release
 ```
 
-打包完成后，EXE 文件位置：
+## 📚 项目结构
+
 ```
-ebox/build/windows/runner/Release/ebox_client.exe
+ebox/
+├── client/                   # Flutter 客户端
+│   ├── lib/
+│   │   ├── main.dart         # 应用入口
+│   │   ├── app.dart          # 应用配置
+│   │   ├── config/           # 配置 (主题、路由)
+│   │   ├── models/           # 数据模型
+│   │   ├── services/         # 服务层 (API、存储)
+│   │   ├── providers/        # 状态管理
+│   │   ├── pages/            # 页面
+│   │   └── widgets/          # 组件
+│   ├── assets/               # 资源文件
+│   ├── test/                 # 测试
+│   └── pubspec.yaml          # 依赖配置
+├── server/                   # Go 服务端 (规划中)
+├── docs/                     # 文档
+└── README.md                 # 本文件
 ```
 
-你可以把这个文件发给其他人使用！
+## 🎯 功能路线图
 
-## 🎨 界面预览
+### 第一阶段 (MVP) - ✅ 已完成
+- [x] Emby 服务器连接
+- [x] 媒体库浏览
+- [x] 视频播放器
+- [x] 本地媒体播放
+- [x] 播放进度记忆
 
-### 设计风格
-- **深色主题**: 深蓝黑色背景，护眼舒适
-- **渐变点缀**: 紫蓝色渐变，科技感十足
-- **圆角设计**: 所有卡片都是圆角，现代感强
-- **大字体**: 清晰易读
+### 第二阶段 (v1.1) - 开发中
+- [ ] 字幕加载和切换
+- [ ] 画质选择
+- [ ] 搜索功能
+- [ ] 播放列表
+- [ ] Android 移动端
 
-### 主要页面
-1. **欢迎页**: 大 Logo + "开始使用"按钮
-2. **服务器列表**: 显示已配置的 Emby 服务器
-3. **主页**: 媒体库网格展示
-4. **海报墙**: 电影/电视剧封面展示
-5. **播放器**: 全屏播放界面
+### 第三阶段 (v1.2) - 规划中
+- [ ] iOS 版本
+- [ ] 音频/有声书
+- [ ] 电子书阅读
+- [ ] 多设备同步
 
-## 🔧 常见问题
+### 第四阶段 (v2.0) - 规划中
+- [ ] Android TV 版本
+- [ ] 漫画阅读
+- [ ] 服务端实现
+- [ ] 元数据自动抓取
 
-### Q1: Flutter 安装失败
-**解决方案**: 
-- 确保网络通畅
-- 使用国内镜像：`export PUB_HOSTED_URL=https://pub.flutter-io.cn`
+## 🤝 贡献
 
-### Q2: Windows 编译失败
-**解决方案**:
-- 确认安装了 Visual Studio
-- 确认勾选了"使用 C++ 的桌面开发"
+欢迎贡献代码！请遵循以下步骤：
 
-### Q3: 连接 Emby 服务器失败
-**解决方案**:
-- 检查服务器地址是否正确
-- 确保服务器在线
-- 检查用户名密码
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
 
-## 📞 技术支持
+## 📝 变更日志
 
-如果在开发过程中遇到问题，请随时告诉我！
+### v1.0.0 (2026-06-03)
+- 🎉 首次发布
+- ✨ Emby 服务器连接功能
+- ✨ 本地媒体播放
+- ✨ 精美的 UI 设计
+- 🐛 已知问题已记录
 
-## 🚀 下一步计划
+## ❓ 常见问题
 
-我会继续完成以下功能：
-1. ✅ 服务器管理页面 (进行中)
-2. ✅ 主页和媒体库
-3. ✅ 视频播放器
-4. ✅ Windows 打包
+### Q: 连接不上 Emby 服务器怎么办？
+**A:** 请检查:
+1. 服务器地址是否正确
+2. 服务器是否在线
+3. 网络是否通畅
+4. 防火墙设置
 
-完成后，你将拥有一个**完整的、可运行的**Windows 版本 E 宝盒！
+### Q: 播放卡顿怎么办？
+**A:** 尝试:
+1. 降低画质（功能开发中）
+2. 使用本地播放
+3. 检查网络速度
+
+### Q: 如何反馈问题？
+**A:** 在 [Issues](https://github.com/lover520f/ebox/issues) 中提交问题
+
+## 📄 开源协议
+
+本项目采用 MIT 协议 - 详见 [LICENSE](LICENSE) 文件
+
+## 🙏 鸣谢
+
+- [Flutter](https://flutter.dev) - 跨平台 UI 框架
+- [Emby](https://emby.media) - 媒体服务器
+- [Video Player](https://pub.dev/packages/video_player) - 视频播放插件
+
+## 📮 联系方式
+
+- 项目地址：https://github.com/lover520f/ebox
+- 问题反馈：https://github.com/lover520f/ebox/issues
 
 ---
 
-**创建日期**: 2026-06-03  
-**作者**: MonkeyCode AI 助手
+**Made with ❤️ by MonkeyCode AI**  
+**Last Updated**: 2026-06-03
