@@ -80,7 +80,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
             stretch: true,
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
-                fill: true,
                 children: [
                   // 使用网络图片
                   if (backdropUrl != null)

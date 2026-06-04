@@ -9,11 +9,13 @@ class MediaProvider extends ChangeNotifier {
   Map<String, List<MediaItem>> _itemsByLibrary = {};
   bool _isLoading = false;
   String? _error;
+  EmbyApiService? _apiClient;
 
   List<MediaLibrary> get libraries => _libraries;
   Map<String, List<MediaItem>> get itemsByLibrary => _itemsByLibrary;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  EmbyApiService? get apiClient => _apiClient;
 
   MediaProvider();
 
@@ -25,7 +27,7 @@ class MediaProvider extends ChangeNotifier {
       notifyListeners();
 
       final serverProvider = ServerProvider();
-      final apiClient = serverProvider.apiClient;
+      _apiClient = serverProvider.apiClient;
       
       if (!serverProvider.isAuthenticated) {
         _error = '未连接到服务器';
@@ -34,7 +36,7 @@ class MediaProvider extends ChangeNotifier {
         return;
       }
 
-      _libraries = await apiClient.getLibraries();
+      _libraries = await _apiClient!.getLibraries();
       
       _isLoading = false;
       notifyListeners();

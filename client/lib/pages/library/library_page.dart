@@ -8,7 +8,7 @@ import '../../providers/server_provider.dart';
 import '../../models/media_item.dart';
 import '../../widgets/media_card.dart';
 import '../../widgets/loading_widget.dart';
-import '../../widgets/error_widget.dart';
+import '../../widgets/error_widget.dart' as custom_widgets;
 
 class LibraryPage extends StatefulWidget {
   final String libraryId;
@@ -135,7 +135,7 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Widget _buildErrorState(String error) {
-    return ErrorWidget(
+    return custom_widgets.ErrorWidget(
       message: '加载失败',
       hint: error,
       icon: Icons.cloud_off_outlined,

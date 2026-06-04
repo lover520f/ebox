@@ -38,7 +38,7 @@ class WelcomePage extends StatelessWidget {
                   boxShadow: AppTheme.elevatedShadow,
                 ),
                 child: const Icon(
-                  Icons.movie_collection_outlined,
+                  Icons.movie_creation_outlined,
                   size: 60,
                   color: Colors.white,
                 ),

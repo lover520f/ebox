@@ -219,7 +219,7 @@ class _ServerAddPageState extends State<ServerAddPage> {
     try {
       final server = EmbyServer(
         id: const Uuid().v4(),
-        name: _nameController.text.trim() || 'Emby 服务器',
+        name: _nameController.text.trim().isEmpty ? 'Emby 服务器' : _nameController.text.trim(),
         url: _urlController.text.trim(),
         username: _usernameController.text.trim().isEmpty 
             ? null 

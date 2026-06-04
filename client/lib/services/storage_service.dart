@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/emby_server.dart';
 import '../models/playback_state.dart';
-import 'constants.dart';
+import '../utils/constants.dart';
 
 class StorageService {
   static late Box<EmbyServer> _serversBox;

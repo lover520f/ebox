@@ -127,10 +127,11 @@ class ServerListPage extends StatelessWidget {
               ],
             ),
             trailing: PopupMenuButton<String>(
-              onSelected: (value) {
+              onSelected: (value) async {
+                final provider = context.read<ServerProvider>();
                 switch (value) {
                   case 'connect':
-                    serverProvider.connectToServer(server.id);
+                    await provider.connectToServer(server.id);
                     break;
                   case 'edit':
                     // TODO: 编辑服务器

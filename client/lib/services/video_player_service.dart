@@ -19,7 +19,6 @@ class VideoPlayerService extends ChangeNotifier {
   double get volume => _volume;
   bool get isMuted => _isMuted;
   double get speed => _speed;
-  ValueListenable<bool>? get isPlayingListener => _controller?.value.isPlaying;
 
   // 初始化视频
   Future<void> initialize(String videoUrl) async {

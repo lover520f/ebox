@@ -34,7 +34,6 @@ class MediaCard extends StatelessWidget {
             // 封面图区域
             Expanded(
               child: Stack(
-                fill: true,
                 children: [
                   // 网络图片或占位图
                   imageUrl != null

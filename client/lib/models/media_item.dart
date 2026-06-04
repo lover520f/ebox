@@ -144,13 +144,13 @@ class MediaSource {
 class People {
   final String id;
   final String name;
-  final String role;
+  final String? role;
   final String type;
   
   const People({
     required this.id,
     required this.name,
-    required this.role,
+    this.role,
     required this.type,
   });
   
