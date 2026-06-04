@@ -9,13 +9,13 @@ class MediaProvider extends ChangeNotifier {
   Map<String, List<MediaItem>> _itemsByLibrary = {};
   bool _isLoading = false;
   String? _error;
-  EmbyApiService? _apiClient;
+  EmbyApiClient? _apiClient;
 
   List<MediaLibrary> get libraries => _libraries;
   Map<String, List<MediaItem>> get itemsByLibrary => _itemsByLibrary;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  EmbyApiService? get apiClient => _apiClient;
+  EmbyApiClient? get apiClient => _apiClient;
 
   MediaProvider();
 
