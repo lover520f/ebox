@@ -30,8 +30,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
           # 删除已存在的 tag
-          git tag -d $VERSION -ErrorAction SilentlyContinue
-          git push origin :refs/tags/$VERSION -ErrorAction SilentlyContinue
+          git tag -d $VERSION 2>$null; if ($?) { git push origin :refs/tags/$VERSION 2>$null }
           
           # 创建并推送新 tag
           git tag $VERSION
