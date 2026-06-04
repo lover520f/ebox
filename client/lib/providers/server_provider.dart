@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/emby_server.dart';
 import '../models/user.dart';
 import '../services/emby_api_service.dart';
-import 'storage_service.dart';
+import '../services/storage_service.dart';
 
 class ServerProvider extends ChangeNotifier {
   final EmbyApiClient _apiClient = EmbyApiClient();

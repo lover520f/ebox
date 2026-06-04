@@ -13,7 +13,7 @@ class MediaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final serverProvider = context.watch<ServerProvider>();
+    final serverProvider = Provider.of<ServerProvider>(context, listen: false);
     final serverUrl = serverProvider.activeServer?.url;
     
     // 构建图片 URL
