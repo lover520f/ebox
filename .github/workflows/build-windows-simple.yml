@@ -28,6 +28,8 @@ jobs:
       - name: Build Windows
         working-directory: ./client
         run: |
+          # 删除旧的 pubspec.lock，在 Windows 上重新生成
+          Remove-Item pubspec.lock -ErrorAction SilentlyContinue
           flutter pub get
           flutter build windows --release
       
