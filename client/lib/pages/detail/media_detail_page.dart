@@ -31,8 +31,20 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     setState(() => _isLoading = true);
     
     final mediaProvider = context.read<MediaProvider>();
+    final apiClient = mediaProvider.apiClient;
+
+    if (apiClient == null) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('未连接到服务器')),
+        );
+      }
+      return;
+    }
+
     try {
-      _mediaItem = await mediaProvider.apiClient.getItemDetail(widget.mediaId);
+      _mediaItem = await apiClient.getItemDetail(widget.mediaId);
     } catch (e) {
       // 错误处理
       if (mounted) {
