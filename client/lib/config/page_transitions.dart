@@ -105,23 +105,18 @@ class SmoothPageTransitions {
       reverseTransitionDuration: const Duration(milliseconds: 300),
     );
   }
-}
 
-/// 自定义路由 - 全局应用流畅动画
-class SmoothGoRouterConfig {
-  static const duration = Duration(milliseconds: 300);
-  static const curve = Curves.easeOutCubic;
-  
-  /// 页面过渡动画构建器
+  /// GoRouter 使用的 transitionsBuilder 方法
   static Widget buildPageTransition({
-    required Widget child,
+    required BuildContext context,
     required Animation<double> animation,
     required Animation<double> secondaryAnimation,
+    required Widget child,
   }) {
     return FadeTransition(
       opacity: CurvedAnimation(
         parent: animation,
-        curve: curve,
+        curve: Curves.easeOutCubic,
       ),
       child: SlideTransition(
         position: Tween<Offset>(
@@ -129,7 +124,7 @@ class SmoothGoRouterConfig {
           end: Offset.zero,
         ).animate(CurvedAnimation(
           parent: animation,
-          curve: curve,
+          curve: Curves.easeOutCubic,
         )),
         child: child,
       ),
