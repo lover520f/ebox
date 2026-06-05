@@ -1,10 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/video_player_service.dart';
 import 'package:intl/intl.dart';
 
-/// 专业级播放器控件
-/// 包含进度条、播放按钮、音量控制、倍速播放等
 class AdvancedPlayerControls extends StatefulWidget {
   const AdvancedPlayerControls({Key? key}) : super(key: key);
 
@@ -40,39 +39,6 @@ class _AdvancedPlayerControlsState extends State<AdvancedPlayerControls> {
     _resetHideTimer();
   }
 
-  Widget _buildSeekBar(VideoPlayerService player) {
-    return ChangeNotifierProxyProvider<VideoPlayerService, String?>(
-      create: (_) => null,
-      update: (context, player, itemId) => player.itemId,
-      child: Consumer<VideoPlayerService>(
-        builder: (context, player, _) {
-          if (!player.isInitialized) return const SizedBox.shrink();
-
-          return SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 4.0,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8.0),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 16.0),
-            ),
-            child: Slider(
-              value: player.position.inMilliseconds.toDouble(),
-              max: player.duration.inMilliseconds.toDouble(),
-              activeColor: Colors.blueAccent,
-              inactiveColor: Colors.white38,
-              onChanged: (value) {
-                player.seekTo(Duration(milliseconds: value.toInt()));
-                _resetHideTimer();
-              },
-              onChangeEnd: (value) {
-                _resetHideTimer();
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Consumer<VideoPlayerService>(
@@ -83,7 +49,6 @@ class _AdvancedPlayerControlsState extends State<AdvancedPlayerControls> {
           onTap: _onInteraction,
           child: Stack(
             children: [
-              // 中央播放按钮（暂停时显示）
               AnimatedOpacity(
                 opacity: (!player.isPlaying && _isControlsVisible) ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 200),
@@ -99,7 +64,6 @@ class _AdvancedPlayerControlsState extends State<AdvancedPlayerControls> {
                 ),
               ),
 
-              // 底部控制栏
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 300),
                 bottom: _isControlsVisible ? 0 : -200,
@@ -124,7 +88,6 @@ class _AdvancedPlayerControlsState extends State<AdvancedPlayerControls> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // 左侧：播放控制
                           Row(
                             children: [
                               IconButton(
@@ -153,7 +116,6 @@ class _AdvancedPlayerControlsState extends State<AdvancedPlayerControls> {
                                 ),
                                 onPressed: () => player.forward(const Duration(seconds: 10)),
                               ),
-                              // 时间显示
                               Padding(
                                 padding: const EdgeInsets.only(left: 16),
                                 child: Text(
@@ -168,7 +130,6 @@ class _AdvancedPlayerControlsState extends State<AdvancedPlayerControls> {
                             ],
                           ),
 
-                          // 右侧：音量
                           Row(
                             children: [
                               Icon(
@@ -199,6 +160,29 @@ class _AdvancedPlayerControlsState extends State<AdvancedPlayerControls> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSeekBar(VideoPlayerService player) {
+    return SliderTheme(
+      data: SliderTheme.of(context).copyWith(
+        trackHeight: 4.0,
+        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8.0),
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 16.0),
+      ),
+      child: Slider(
+        value: player.position.inMilliseconds.toDouble(),
+        max: player.duration.inMilliseconds.toDouble(),
+        activeColor: Colors.blueAccent,
+        inactiveColor: Colors.white38,
+        onChanged: (value) {
+          player.seekTo(Duration(milliseconds: value.toInt()));
+          _resetHideTimer();
+        },
+        onChangeEnd: (value) {
+          _resetHideTimer();
+        },
+      ),
     );
   }
 

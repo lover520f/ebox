@@ -77,7 +77,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     });
 
     try {
-      // 显示加载中
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Row(
@@ -91,15 +90,12 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
         ),
       );
 
-      // 获取播放 URL
       final videoUrl = await apiClient.getPlaybackUrl(_mediaItem!.id);
       
       if (!mounted) return;
       
-      // 关闭加载提示
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-      // 跳转到播放器
       context.push(
         '/player/${_mediaItem!.id}',
         extra: {
@@ -322,27 +318,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                       }).toList(),
                     ),
                     const SizedBox(height: AppTheme.spacingL),
-                  ],
-                  
-                  if (_mediaItem!.tags != null && _mediaItem!.tags!.isNotEmpty) ...[
-                    const Text(
-                      '标签',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: AppTheme.spacingM),
-                    Wrap(
-                      spacing: AppTheme.spacingS,
-                      runSpacing: AppTheme.spacingS,
-                      children: _mediaItem!.tags!.map((tag) {
-                        return Chip(
-                          label: Text('#$tag'),
-                          backgroundColor: AppTheme.surfaceColor,
-                        );
-                      }).toList(),
-                    ),
                   ],
                   const SizedBox(height: AppTheme.spacingXL),
                 ],
