@@ -58,9 +58,9 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
       
       // 如果是电视剧，加载季列表
       if (_mediaItem?.type == 'Season' || _mediaItem?.type == 'Series') {
-        final seasons = await apiClient.getLibraryItems(
-          libraryId: widget.itemId,
-          mediaType: 'Season',
+        // final seasons = await apiClient.getLibraryItems(
+          // libraryId: widget.itemId,
+          // mediaType: 'Season',
         );
         if (seasons.isNotEmpty) {
           _seasons = seasons;
@@ -381,8 +381,8 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
       margin: const EdgeInsets.only(right: AppTheme.spacingM),
       child: InkWell(
         onTap: () {
-          context.push('/season/${widget.itemId}/${season.id}', queryParameters: {
-            'name': season.name ?? '季',
+          context.push('/season/${widget.itemId}/${season.id}', extra: {
+            'name': season.name ?? '季'
           });
         },
         borderRadius: BorderRadius.circular(AppTheme.radiusMedium),

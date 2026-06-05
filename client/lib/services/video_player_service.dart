@@ -1,4 +1,5 @@
 import 'package:video_player/video_player.dart';
+import 'media_streams_service.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'emby_api_client.dart';
@@ -181,18 +182,4 @@ class VideoPlayerService extends ChangeNotifier {
   }
 }
 
-  // 字幕和音轨相关
-  List<SubtitleStream> _subtitles = [];
-  List<AudioStream> _audioTracks = [];
-
-  List<SubtitleStream> get subtitles => _subtitles;
-  List<AudioStream> get audioTracks => _audioTracks;
-
-  void setMediaStreams({
-    List<SubtitleStream> subtitles = const [],
-    List<AudioStream> audioTracks = const [],
-  }) {
-    _subtitles = subtitles;
-    _audioTracks = audioTracks;
-    notifyListeners();
   }

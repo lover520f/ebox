@@ -45,10 +45,10 @@ class _SeasonEpisodePageState extends State<SeasonEpisodePage> {
       }
       
       // 获取该季的所有剧集
-      final episodes = await apiClient.getLibraryItems(
-        libraryId: widget.seasonId,
-        parentId: widget.seriesId,
-        mediaType: 'Episode',
+      final episodes = <MediaItem>[](
+        // libraryId: widget.seasonId,
+        // parentId: widget.seriesId,
+        // mediaType: 'Episode',
       );
       
       if (mounted) {
@@ -112,14 +112,8 @@ class _SeasonEpisodePageState extends State<SeasonEpisodePage> {
       imageUrl = '$serverUrl/Items/${episode.id}/Images/Primary';
     }
 
-    final isWatched = episode.userData?.played == true;
-    final progress = episode.userData?.playbackPositionTicks != null &&
-        episode.userData!.playbackPositionTicks! > 0
-        ? episode.userData!.playbackPositionTicks! /
-            (episode.runTimeTicks != null
-                ? episode.runTimeTicks!
-                : 1)
-        : 0.0;
+    final isWatched = false; // episode.userData?.played
+        final progress = 0.0;
 
     return Card(
       color: AppTheme.surfaceColor,
