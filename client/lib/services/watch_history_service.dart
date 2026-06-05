@@ -2,21 +2,17 @@ import 'dart:convert';
 import 'package:hive/hive.dart';
 import '../models/media_item.dart';
 
-/// 观看历史服务
-/// 管理本地观看历史记录
 class WatchHistoryService {
   static const String _boxName = 'watch_history';
   late Box<Map> _box;
 
-  /// 初始化
   Future<void> init() async {
     _box = await Hive.openBox<Map>(_boxName);
   }
 
-  /// 添加观看记录
   Future<void> addItem(MediaItem item, {
-    required Duration position,
-    required Duration duration,
+    required int positionMs,
+    required int durationMs,
     required DateTime watchedAt,
     double? progress,
   }) async {
@@ -27,16 +23,15 @@ class WatchHistoryService {
       imageUrl: item.imageTags?.isNotEmpty == true 
           ? item.imageTags!.keys.first 
           : null,
-      position: position.inMilliseconds,
-      duration: duration.inMilliseconds,
-      progress: progress ?? (position.inMilliseconds / duration.inMilliseconds),
+      positionMs: positionMs,
+      durationMs: durationMs,
+      progress: progress ?? (positionMs / durationMs),
       watchedAt: watchedAt,
     );
     
     await _box.put(item.id, record.toMap());
   }
 
-  /// 获取所有观看历史
   List<WatchHistoryRecord> getAll({
     int limit = 100,
     DateTime? after,
@@ -45,15 +40,12 @@ class WatchHistoryService {
         .map((e) => WatchHistoryRecord.fromMap(e as Map))
         .toList();
     
-    // 按观看时间倒序
     records.sort((a, b) => b.watchedAt.compareTo(a.watchedAt));
     
-    // 过滤时间
     if (after != null) {
       records.removeWhere((r) => r.watchedAt.isBefore(after));
     }
     
-    // 限制数量
     if (records.length > limit) {
       return records.sublist(0, limit);
     }
@@ -61,33 +53,27 @@ class WatchHistoryService {
     return records;
   }
 
-  /// 获取单个记录
   WatchHistoryRecord? get(String itemId) {
     final data = _box.get(itemId);
     if (data == null) return null;
     return WatchHistoryRecord.fromMap(data);
   }
 
-  /// 删除记录
   Future<void> remove(String itemId) async {
     await _box.delete(itemId);
   }
 
-  /// 清空所有历史
   Future<void> clear() async {
     await _box.clear();
   }
 
-  /// 获取记录数量
   int get length => _box.length;
 
-  /// 关闭
   Future<void> close() async {
     await _box.close();
   }
 }
 
-/// 观看历史记录
 class WatchHistoryRecord {
   final String itemId;
   final String name;

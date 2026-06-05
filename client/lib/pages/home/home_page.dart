@@ -124,7 +124,7 @@ class HomeContent extends StatelessWidget {
           height: 180,
           decoration: BoxDecoration(
             color: AppTheme.surfaceColor,
-            borderRadius: BorderRadius.circular(AppTheme.radiusM),
+            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
           ),
           child: Center(
             child: Text(

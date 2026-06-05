@@ -143,7 +143,7 @@ class _WatchHistoryPageState extends State<WatchHistoryPage> {
         onTap: () {
           context.push('/detail/${record.itemId}');
         },
-        borderRadius: BorderRadius.circular(AppTheme.radiusM),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
         child: Padding(
           padding: const EdgeInsets.all(AppTheme.spacingM),
           child: Row(
@@ -151,7 +151,7 @@ class _WatchHistoryPageState extends State<WatchHistoryPage> {
             children: [
               // 海报
               ClipRRect(
-                borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                 child: imageUrl != null
                     ? CachedNetworkImage(
                         imageUrl: imageUrl,

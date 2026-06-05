@@ -96,14 +96,14 @@ class _SeasonEpisodePageState extends State<SeasonEpisodePage> {
         onTap: () {
           context.push('/detail/${episode.id}');
         },
-        borderRadius: BorderRadius.circular(AppTheme.radiusM),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
         child: Padding(
           padding: const EdgeInsets.all(AppTheme.spacingM),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                 child: imageUrl != null
                     ? CachedNetworkImage(
                         imageUrl: imageUrl,
@@ -124,7 +124,7 @@ class _SeasonEpisodePageState extends State<SeasonEpisodePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${episode.indexNumber ?? 0}. ${episode.name ?? '未命名'}',
+                      '${episode.episodeNumber ?? 0}. ${episode.name ?? '未命名'}',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
