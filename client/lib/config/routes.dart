@@ -92,8 +92,6 @@ class AppRouter {
           return CustomTransitionPage(
             child: MediaDetailPage(
               itemId: state.pathParameters['itemId']!,
-              serverId: extra?['serverId'] as String?,
-              itemIdPath: extra?['itemIdPath'] as List<String>?,
             ),
             transitionsBuilder: SmoothPageTransitions.buildPageTransition,
             transitionDuration: const Duration(milliseconds: 280),
