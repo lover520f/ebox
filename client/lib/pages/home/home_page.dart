@@ -1,236 +1,214 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../config/theme.dart';
-import '../../providers/server_provider.dart';
-import '../../providers/media_provider.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({Key? key}) : super(key: key);
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  @override
-  void initState() {
-    super.initState();
-    // 延迟加载以确保 ServerProvider 已初始化
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // 等待一下确保 ServerProvider 已经加载完成
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (mounted) {
-        await context.read<MediaProvider>().loadLibraries();
-      }
-    });
-  }
+  int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
-    final serverProvider = context.watch<ServerProvider>();
-
     return Scaffold(
-      body: Column(
-        children: [
-          // 顶部导航栏
-          Container(
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + AppTheme.spacingM,
-              left: AppTheme.spacingM,
-              right: AppTheme.spacingM,
-            ),
-            child: Row(
-              children: [
-                const Text(
-                  'E 宝盒',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.search),
-                  onPressed: () {
-                    // TODO: 搜索功能
-                  },
-                  tooltip: '搜索',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings),
-                  onPressed: () {
-                    context.goNamed('settings');
-                  },
-                  tooltip: '设置',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppTheme.spacingM),
-          // 内容区域
-          Expanded(
-            child: !serverProvider.isAuthenticated
-                ? _buildNotAuthenticated()
-                : _buildContent(),
-          ),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: const [
+          HomeContent(),
+          Placeholder(),
+          Placeholder(),
+          MyPage(),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: '首页',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.video_library),
-            label: 'Emby',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.folder),
-            label: '本地',
-          ),
-        ],
-        currentIndex: 0,
-        selectedItemColor: AppTheme.primaryColor,
-        unselectedItemColor: AppTheme.textSecondary,
-        backgroundColor: AppTheme.surfaceColor,
-        onTap: (index) {
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) {
+          setState(() => _selectedIndex = index);
           if (index == 1) {
-            context.goNamed('servers');
+            context.push('/search');
           } else if (index == 2) {
-            context.goNamed('local');
+            context.push('/servers');
+          } else if (index == 3) {
+            context.push('/history');
           }
         },
+        backgroundColor: AppTheme.surfaceColor,
+        indicatorColor: AppTheme.primaryColor.withOpacity(0.2),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: '首页',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.search),
+            label: '搜索',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.video_library_outlined),
+            selectedIcon: Icon(Icons.video_library),
+            label: '媒体库',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: '我的',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class HomeContent extends StatelessWidget {
+  const HomeContent({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: AppBar(
+        title: const Text('E 宝盒'),
+        backgroundColor: AppTheme.backgroundColor,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => context.push('/settings'),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppTheme.spacingM),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSection('继续观看', Icons.play_circle_outline, () {}),
+            const SizedBox(height: AppTheme.spacingL),
+            _buildSection('最近添加', Icons.add, () {}),
+            const SizedBox(height: AppTheme.spacingL),
+            _buildSection('我的媒体库', Icons.video_library, () {
+              context.push('/servers');
+            }),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildNotAuthenticated() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.cloud_off,
-            size: 80,
-            color: AppTheme.textSecondary,
+  Widget _buildSection(String title, IconData icon, VoidCallback onNavigate) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            IconButton(
+              icon: Icon(icon),
+              onPressed: onNavigate,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppTheme.spacingM),
+        Container(
+          height: 180,
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceColor,
+            borderRadius: BorderRadius.circular(AppTheme.radiusM),
           ),
-          const SizedBox(height: AppTheme.spacingL),
-          const Text(
-            '未连接到服务器',
-            style: TextStyle(
-              fontSize: 20,
-              color: AppTheme.textPrimary,
+          child: Center(
+            child: Text(
+              '功能开发中...',
+              style: TextStyle(color: Colors.grey[400]),
             ),
           ),
-          const SizedBox(height: AppTheme.spacingM),
-          ElevatedButton(
-            onPressed: () {
-              context.goNamed('servers');
-            },
-            child: const Text('连接服务器'),
+        ),
+      ],
+    );
+  }
+}
+
+class MyPage extends StatelessWidget {
+  const MyPage({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: AppBar(
+        title: const Text('我的'),
+        backgroundColor: AppTheme.backgroundColor,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(AppTheme.spacingM),
+        children: [
+          _buildMenuItem(
+            context,
+            icon: Icons.history,
+            title: '观看历史',
+            subtitle: '查看观看记录',
+            onTap: () => context.push('/history'),
+          ),
+          const Divider(height: 1),
+          _buildMenuItem(
+            context,
+            icon: Icons.video_library,
+            title: '媒体库',
+            subtitle: '管理 Emby 服务器',
+            onTap: () => context.push('/servers'),
+          ),
+          const Divider(height: 1),
+          _buildMenuItem(
+            context,
+            icon: Icons.local_movies,
+            title: '本地媒体',
+            subtitle: '浏览本地视频文件',
+            onTap: () => context.push('/local'),
+          ),
+          const Divider(height: 1),
+          _buildMenuItem(
+            context,
+            icon: Icons.settings,
+            title: '设置',
+            subtitle: '应用配置',
+            onTap: () => context.push('/settings'),
+          ),
+          const Divider(height: 1),
+          _buildMenuItem(
+            context,
+            icon: Icons.info_outline,
+            title: '关于',
+            subtitle: '版本 v2.1.0',
+            onTap: () {},
           ),
         ],
       ),
     );
   }
 
-  Widget _buildContent() {
-    final mediaProvider = context.watch<MediaProvider>();
-    final libraries = mediaProvider.libraries;
-
-    if (libraries.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        await mediaProvider.loadLibraries();
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.all(AppTheme.spacingM),
-        itemCount: libraries.length,
-        itemBuilder: (context, index) {
-          final library = libraries[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: AppTheme.spacingM),
-            child: InkWell(
-              onTap: () {
-                context.goNamed('library', pathParameters: {
-                  'libraryId': library.id,
-                });
-              },
-              borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-              child: Padding(
-                padding: const EdgeInsets.all(AppTheme.spacingM),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: AppTheme.gradientColors,
-                        ),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                      ),
-                      child: Icon(
-                        _getLibraryIcon(library.collectionType),
-                        size: 40,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: AppTheme.spacingM),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            library.name,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: AppTheme.spacingXS),
-                          Text(
-                            library.displayType,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+  Widget _buildMenuItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    VoidCallback? onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: AppTheme.primaryColor),
+      title: Text(title),
+      subtitle: Text(subtitle, style: TextStyle(color: Colors.grey[400])),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
-  }
-
-  IconData _getLibraryIcon(String? collectionType) {
-    switch (collectionType) {
-      case 'movies':
-        return Icons.movie;
-      case 'tvshows':
-        return Icons.tv;
-      case 'music':
-        return Icons.music_note;
-      case 'books':
-        return Icons.book;
-      default:
-        return Icons.folder;
-    }
   }
 }

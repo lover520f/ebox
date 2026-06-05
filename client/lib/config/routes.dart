@@ -10,6 +10,9 @@ import '../pages/detail/media_detail_page.dart';
 import '../pages/playback/video_player_page.dart';
 import '../pages/settings/settings_page.dart';
 import '../pages/local/local_media_page.dart';
+import '../pages/history/watch_history_page.dart';
+import '../pages/search/search_page.dart';
+import '../pages/series/season_episode_page.dart';
 import 'page_transitions.dart';
 
 class AppRouter {
@@ -68,6 +71,20 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: '/season/:seriesId/:seasonId',
+        name: 'season',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: SeasonEpisodePage(
+            seriesId: state.pathParameters['seriesId']!,
+            seasonId: state.pathParameters['seasonId']!,
+            seasonName: state.uri.queryParameters['name'] ?? '季',
+          ),
+          transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+          transitionDuration: const Duration(milliseconds: 280),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+        ),
+      ),
+      GoRoute(
         path: '/detail/:itemId',
         name: 'detail',
         pageBuilder: (context, state) {
@@ -100,6 +117,26 @@ class AppRouter {
             reverseTransitionDuration: const Duration(milliseconds: 250),
           );
         },
+      ),
+      GoRoute(
+        path: '/search',
+        name: 'search',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const SearchPage(),
+          transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+          transitionDuration: const Duration(milliseconds: 280),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+        ),
+      ),
+      GoRoute(
+        path: '/history',
+        name: 'history',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const WatchHistoryPage(),
+          transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+          transitionDuration: const Duration(milliseconds: 280),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+        ),
       ),
       GoRoute(
         path: '/settings',
