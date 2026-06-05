@@ -7,7 +7,7 @@ import '../pages/server/server_list_page.dart';
 import '../pages/server/server_add_page.dart';
 import '../pages/library/library_page.dart';
 import '../pages/detail/media_detail_page.dart';
-import '../pages/player/video_player_page.dart';
+import '../pages/playback/video_player_page.dart';
 import '../pages/settings/settings_page.dart';
 import '../pages/local/local_media_page.dart';
 import 'page_transitions.dart';
@@ -49,7 +49,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/servers/add',
-        name: 'server-add',
+        name: 'add-server',
         pageBuilder: (context, state) => CustomTransitionPage(
           child: const ServerAddPage(),
           transitionsBuilder: SmoothPageTransitions.buildPageTransition,
@@ -60,23 +60,24 @@ class AppRouter {
       GoRoute(
         path: '/library/:libraryId',
         name: 'library',
-        pageBuilder: (context, state) {
-          final libraryId = state.pathParameters['libraryId']!;
-          return CustomTransitionPage(
-            child: LibraryPage(libraryId: libraryId),
-            transitionsBuilder: SmoothPageTransitions.buildPageTransition,
-            transitionDuration: const Duration(milliseconds: 280),
-            reverseTransitionDuration: const Duration(milliseconds: 250),
-          );
-        },
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: LibraryPage(libraryId: state.pathParameters['libraryId']!),
+          transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+          transitionDuration: const Duration(milliseconds: 280),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+        ),
       ),
       GoRoute(
-        path: '/detail/:mediaId',
+        path: '/detail/:itemId',
         name: 'detail',
         pageBuilder: (context, state) {
-          final mediaId = state.pathParameters['mediaId']!;
+          final extra = state.extra as Map<String, dynamic>?;
           return CustomTransitionPage(
-            child: MediaDetailPage(mediaId: mediaId),
+            child: MediaDetailPage(
+              itemId: state.pathParameters['itemId']!,
+              serverId: extra?['serverId'] as String?,
+              itemIdPath: extra?['itemIdPath'] as List<String>?,
+            ),
             transitionsBuilder: SmoothPageTransitions.buildPageTransition,
             transitionDuration: const Duration(milliseconds: 280),
             reverseTransitionDuration: const Duration(milliseconds: 250),
@@ -84,13 +85,16 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: '/player',
+        path: '/player/:itemId',
         name: 'player',
         pageBuilder: (context, state) {
-          final itemId = state.uri.queryParameters['itemId'];
-          final serverId = state.uri.queryParameters['serverId'];
+          final extra = state.extra as Map<String, dynamic>;
           return CustomTransitionPage(
-            child: VideoPlayerPage(itemId: itemId!, serverId: serverId!),
+            child: VideoPlayerPage(
+              videoUrl: extra['videoUrl'] as String,
+              itemId: state.pathParameters['itemId']!,
+              title: extra['title'] as String? ?? '视频播放',
+            ),
             transitionsBuilder: SmoothPageTransitions.buildPageTransition,
             transitionDuration: const Duration(milliseconds: 280),
             reverseTransitionDuration: const Duration(milliseconds: 250),

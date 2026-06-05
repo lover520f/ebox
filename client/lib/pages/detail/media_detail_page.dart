@@ -7,11 +7,19 @@ import '../../config/theme.dart';
 import '../../models/media_item.dart';
 import '../../providers/media_provider.dart';
 import '../../providers/server_provider.dart';
+import '../../services/emby_api_client.dart';
 
 class MediaDetailPage extends StatefulWidget {
-  final String mediaId;
+  final String itemId;
+  final String? serverId;
+  final List<String>? itemIdPath;
 
-  const MediaDetailPage({super.key, required this.mediaId});
+  const MediaDetailPage({
+    Key? key,
+    required this.itemId,
+    this.serverId,
+    this.itemIdPath,
+  }) : super(key: key);
 
   @override
   State<MediaDetailPage> createState() => _MediaDetailPageState();
@@ -20,6 +28,7 @@ class MediaDetailPage extends StatefulWidget {
 class _MediaDetailPageState extends State<MediaDetailPage> {
   MediaItem? _mediaItem;
   bool _isLoading = true;
+  bool _isPlaying = false;
 
   @override
   void initState() {
@@ -27,7 +36,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     _loadMediaDetail();
   }
 
-  void _loadMediaDetail() async {
+  Future<void> _loadMediaDetail() async {
     setState(() => _isLoading = true);
     
     final mediaProvider = context.read<MediaProvider>();
@@ -44,9 +53,8 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     }
 
     try {
-      _mediaItem = await apiClient.getItemDetail(widget.mediaId);
+      _mediaItem = await apiClient.getItemDetail(widget.itemId);
     } catch (e) {
-      // 错误处理
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('加载失败：$e')),
@@ -55,6 +63,61 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _playMedia() async {
+    if (_mediaItem == null) return;
+    
+    final apiClient = context.read<EmbyApiClient>();
+    
+    setState(() {
+      _isPlaying = true;
+    });
+
+    try {
+      // 显示加载中
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('正在获取播放地址...'),
+            ],
+          ),
+          duration: Duration(seconds: 30),
+        ),
+      );
+
+      // 获取播放 URL
+      final videoUrl = await apiClient.getPlaybackUrl(_mediaItem!.id);
+      
+      if (!mounted) return;
+      
+      // 关闭加载提示
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      // 跳转到播放器
+      context.push(
+        '/player/${_mediaItem!.id}',
+        extra: {
+          'videoUrl': videoUrl,
+          'title': _mediaItem!.name,
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('播放失败：$e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+        });
       }
     }
   }
@@ -85,7 +148,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          // 背景海报
           SliverAppBar(
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
@@ -99,7 +161,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 children: [
-                  // 使用网络图片
                   if (backdropUrl != null)
                     CachedNetworkImage(
                       imageUrl: backdropUrl,
@@ -120,7 +181,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                     )
                   else
                     _buildPlaceholder(),
-                  // 渐变遮罩
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -148,14 +208,12 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
             ],
           ),
           
-          // 内容区域
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(AppTheme.spacingL),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 标题和元数据
                   Text(
                     _mediaItem!.name,
                     style: const TextStyle(
@@ -165,7 +223,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                   ),
                   const SizedBox(height: AppTheme.spacingM),
                   
-                  // 元数据行
                   Wrap(
                     spacing: AppTheme.spacingM,
                     runSpacing: AppTheme.spacingS,
@@ -200,20 +257,23 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                   
                   const SizedBox(height: AppTheme.spacingL),
                   
-                  // 播放按钮
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        // TODO: 跳转到播放器
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('播放器功能开发中...')),
-                        );
-                      },
-                      icon: const Icon(Icons.play_arrow, size: 28),
-                      label: const Text(
-                        '播放',
-                        style: TextStyle(fontSize: 18),
+                      onPressed: _isPlaying ? null : _playMedia,
+                      icon: _isPlaying
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Icon(Icons.play_arrow, size: 28),
+                      label: Text(
+                        _isPlaying ? '获取播放地址中...' : '播放',
+                        style: const TextStyle(fontSize: 18),
                       ),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingM),
@@ -223,7 +283,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                   
                   const SizedBox(height: AppTheme.spacingL),
                   
-                  // 剧情简介
                   if (_mediaItem!.overview != null) ...[
                     const Text(
                       '剧情简介',
@@ -243,7 +302,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                     const SizedBox(height: AppTheme.spacingL),
                   ],
                   
-                  // 类型标签
                   if (_mediaItem!.genres != null && _mediaItem!.genres!.isNotEmpty) ...[
                     const Text(
                       '类型',
@@ -259,36 +317,34 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                       children: _mediaItem!.genres!.map((genre) {
                         return Chip(
                           label: Text(genre),
-                          backgroundColor: AppTheme.cardColor,
+                          backgroundColor: AppTheme.surfaceColor,
                         );
                       }).toList(),
                     ),
                     const SizedBox(height: AppTheme.spacingL),
                   ],
                   
-                  // 演职员表
-                  if (_mediaItem!.people != null && _mediaItem!.people!.isNotEmpty) ...[
+                  if (_mediaItem!.tags != null && _mediaItem!.tags!.isNotEmpty) ...[
                     const Text(
-                      '演职员',
+                      '标签',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: AppTheme.spacingM),
-                    SizedBox(
-                      height: 140,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _mediaItem!.people!.length,
-                        itemBuilder: (context, index) {
-                          final person = _mediaItem!.people![index];
-                          return _buildPersonCard(person);
-                        },
-                      ),
+                    Wrap(
+                      spacing: AppTheme.spacingS,
+                      runSpacing: AppTheme.spacingS,
+                      children: _mediaItem!.tags!.map((tag) {
+                        return Chip(
+                          label: Text('#$tag'),
+                          backgroundColor: AppTheme.surfaceColor,
+                        );
+                      }).toList(),
                     ),
-                    const SizedBox(height: AppTheme.spacingL),
                   ],
+                  const SizedBox(height: AppTheme.spacingXL),
                 ],
               ),
             ),
@@ -296,86 +352,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
         ],
       ),
     );
-  }
-
-  Widget _buildMetadataChip(IconData icon, String label, {Color? color}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spacingM,
-        vertical: AppTheme.spacingS,
-      ),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color ?? AppTheme.textSecondary),
-          const SizedBox(width: AppTheme.spacingXS),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: color ?? AppTheme.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPersonCard(dynamic person) {
-    return Container(
-      width: 100,
-      margin: const EdgeInsets.only(right: AppTheme.spacingM),
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppTheme.cardColor,
-              borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-            ),
-            child: Icon(Icons.person, size: 40, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: AppTheme.spacingS),
-          Text(
-            person.name,
-            style: const TextStyle(fontSize: 12),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-          if (person.role != null) ...[
-            const SizedBox(height: AppTheme.spacingXS),
-            Text(
-              person.role,
-              style: const TextStyle(
-                fontSize: 10,
-                color: AppTheme.textSecondary,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  IconData _getIconForType(String type) {
-    switch (type) {
-      case 'Movie':
-        return Icons.movie;
-      case 'Series':
-        return Icons.tv;
-      case 'Episode':
-        return Icons.slideshow;
-      default:
-        return Icons.theater_comedy;
-    }
   }
 
   Widget _buildPlaceholder() {
@@ -390,13 +366,19 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
           ],
         ),
       ),
-      child: Center(
-        child: Icon(
-          _getIconForType(_mediaItem!.type),
-          size: 120,
-          color: AppTheme.textSecondary.withOpacity(0.3),
-        ),
+      child: const Icon(
+        Icons.movie,
+        size: 100,
+        color: Colors.white24,
       ),
+    );
+  }
+
+  Widget _buildMetadataChip(IconData icon, String label, {Color? color}) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: color ?? Colors.white),
+      label: Text(label, style: const TextStyle(color: Colors.white)),
+      backgroundColor: AppTheme.surfaceColor.withOpacity(0.8),
     );
   }
 }
