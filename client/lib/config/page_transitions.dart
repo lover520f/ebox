@@ -107,12 +107,13 @@ class SmoothPageTransitions {
   }
 
   /// GoRouter 使用的 transitionsBuilder 方法
-  static Widget buildPageTransition({
-    required BuildContext context,
-    required Animation<double> animation,
-    required Animation<double> secondaryAnimation,
-    required Widget child,
-  }) {
+  /// 注意：参数顺序必须是 (context, animation, secondaryAnimation, child)
+  static Widget buildPageTransition(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
     return FadeTransition(
       opacity: CurvedAnimation(
         parent: animation,
