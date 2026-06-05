@@ -40,14 +40,21 @@ class _SeasonEpisodePageState extends State<SeasonEpisodePage> {
       final mediaProvider = context.read<MediaProvider>();
       final apiClient = mediaProvider.apiClient;
       
-      if (apiClient != null) {
-        final episodes = await apiClient.getSeasons(widget.seriesId, widget.seasonId);
-        if (mounted) {
-          setState(() {
-            _episodes = episodes;
-            _isLoading = false;
-          });
-        }
+      if (apiClient == null) {
+        throw Exception('未连接到服务器');
+      }
+      
+      // 使用 getLibraryItems 获取剧集
+      final episodes = await apiClient.getLibraryItems(
+        libraryId: widget.seasonId,
+        parentId: widget.seriesId,
+      );
+      
+      if (mounted) {
+        setState(() {
+          _episodes = episodes;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -77,7 +84,8 @@ class _SeasonEpisodePageState extends State<SeasonEpisodePage> {
                   itemBuilder: (context, index) {
                     return _buildEpisodeCard(_episodes[index]);
                   },
-                );
+                ),
+    );
   }
 
   Widget _buildEpisodeCard(MediaItem episode) {
@@ -85,7 +93,7 @@ class _SeasonEpisodePageState extends State<SeasonEpisodePage> {
     final serverUrl = serverProvider.activeServer?.url;
     
     String? imageUrl;
-    if (serverUrl != null && episode.imageTags?.isNotEmpty == true) {
+    if (serverUrl != null) {
       imageUrl = '$serverUrl/Items/${episode.id}/Images/Primary';
     }
 
