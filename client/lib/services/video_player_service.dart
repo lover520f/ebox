@@ -9,7 +9,7 @@ class VideoPlayerService extends ChangeNotifier {
   bool _isPlaying = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
-  Duration _bufferedPosition = Duration.zero;
+  List<DurationRange> _buffered = [];
   double _volume = 1.0;
   bool _isMuted = false;
   double _speed = 1.0;
@@ -24,7 +24,7 @@ class VideoPlayerService extends ChangeNotifier {
   bool get isVideoInitialized => _controller?.value.isInitialized ?? false;
   Duration get position => _position;
   Duration get duration => _duration;
-  Duration get bufferedPosition => _bufferedPosition;
+  List<DurationRange> get buffered => _buffered;
   double get volume => _volume;
   bool get isMuted => _isMuted;
   double get speed => _speed;
@@ -37,12 +37,10 @@ class VideoPlayerService extends ChangeNotifier {
 
   Future<void> initialize(String videoUrl, {String? itemId}) async {
     try {
-      await dispose();
+      _controller?.removeListener(_onPlayerChanged);
+      _controller?.dispose();
       
-      _controller = VideoPlayerController.networkUrl(
-        Uri.parse(videoUrl),
-      );
-      
+      _controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
       await _controller!.initialize();
       _controller!.addListener(_onPlayerChanged);
       
@@ -64,7 +62,7 @@ class VideoPlayerService extends ChangeNotifier {
     final value = _controller!.value;
     _position = value.position;
     _isPlaying = value.isPlaying;
-    _bufferedPosition = value.buffered;
+    _buffered = value.buffered;
     
     if (_isPlaying && _position.inSeconds % 10 == 0) {
       _reportProgress();
@@ -109,27 +107,18 @@ class VideoPlayerService extends ChangeNotifier {
   Future<void> seekTo(Duration position) async {
     if (_controller != null && _isInitialized) {
       await _controller!.seekTo(position);
-      _position = position;
       notifyListeners();
     }
   }
 
   Future<void> forward(Duration duration) async {
     final newPosition = _position + duration;
-    if (newPosition > _duration) {
-      seekTo(_duration);
-    } else {
-      seekTo(newPosition);
-    }
+    seekTo(newPosition > _duration ? _duration : newPosition);
   }
 
   Future<void> rewind(Duration duration) async {
     final newPosition = _position - duration;
-    if (newPosition < Duration.zero) {
-      seekTo(Duration.zero);
-    } else {
-      seekTo(newPosition);
-    }
+    seekTo(newPosition < Duration.zero ? Duration.zero : newPosition);
   }
 
   Future<void> setVolume(double volume) async {

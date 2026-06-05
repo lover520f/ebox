@@ -64,13 +64,7 @@ class EmbyApiClient {
       _accessToken = data['AccessToken'];
       _userId = data['User']['Id'];
       
-      _currentUser = User(
-        id: _userId!,
-        name: data['User']['Name'] ?? username,
-        policy: data['User']['Policy'] != null
-            ? UserPolicy.fromJson(data['User']['Policy'])
-            : null,
-      );
+      _currentUser = User.fromJson(data['User']);
 
       return _currentUser!;
     } catch (e) {
@@ -149,19 +143,17 @@ class EmbyApiClient {
     }
 
     try {
-      final queryParams = {
-        'UserId': _userId,
-        'Recursive': 'true',
-        'StartIndex': startIndex.toString(),
-        'Limit': limit.toString(),
-        'SortBy': 'SortName',
-        'SortOrder': 'Ascending',
-        if (parentId != null) 'ParentId': parentId,
-      };
-
       final response = await _dio.get(
         '$_baseUrl/Users/$_userId/Items',
-        queryParameters: queryParams,
+        queryParameters: {
+          'UserId': _userId,
+          'Recursive': 'true',
+          'StartIndex': startIndex.toString(),
+          'Limit': limit.toString(),
+          'SortBy': 'SortName',
+          'SortOrder': 'Ascending',
+          if (parentId != null) 'ParentId': parentId,
+        },
         options: Options(
           headers: {
             'X-MediaBrowser-Token': _accessToken!,
@@ -246,7 +238,6 @@ class EmbyApiClient {
       throw Exception('请先连接到 Emby 服务器');
     }
 
-    // 获取媒体源信息
     final response = await _dio.get(
       '$_baseUrl/Items/$itemId',
       queryParameters: {
@@ -266,7 +257,6 @@ class EmbyApiClient {
       throw Exception('无法获取播放地址');
     }
 
-    // 优先使用 DirectStreamUrl，如果没有则使用静态流
     final url = mediaSources['DirectStreamUrl'] ?? mediaSources['StaticStreamUrl'];
     
     if (!url.startsWith('http')) {
@@ -278,14 +268,9 @@ class EmbyApiClient {
 
   Future<void> reportPlaybackStart(String itemId) async {
     if (_baseUrl == null || _accessToken == null) return;
-    
     try {
       await _dio.post(
         '$_baseUrl/Sessions/Playing',
-        queryParameters: {
-          'ItemId': itemId,
-          'ServerId': _baseUrl,
-        },
         data: {
           'ItemId': itemId,
           'ServerId': _baseUrl,
@@ -299,21 +284,14 @@ class EmbyApiClient {
           },
         ),
       );
-    } catch (e) {
-      // 忽略报告失败
-    }
+    } catch (e) {}
   }
 
   Future<void> reportPlaybackProgress(String itemId, Duration position) async {
     if (_baseUrl == null || _accessToken == null) return;
-    
     try {
       await _dio.post(
         '$_baseUrl/Sessions/Playing/Progress',
-        queryParameters: {
-          'ItemId': itemId,
-          'ServerId': _baseUrl,
-        },
         data: {
           'ItemId': itemId,
           'ServerId': _baseUrl,
@@ -327,21 +305,14 @@ class EmbyApiClient {
           },
         ),
       );
-    } catch (e) {
-      // 忽略报告失败
-    }
+    } catch (e) {}
   }
 
   Future<void> reportPlaybackStopped(String itemId, Duration position) async {
     if (_baseUrl == null || _accessToken == null) return;
-    
     try {
       await _dio.post(
         '$_baseUrl/Sessions/Playing/Stopped',
-        queryParameters: {
-          'ItemId': itemId,
-          'ServerId': _baseUrl,
-        },
         data: {
           'ItemId': itemId,
           'ServerId': _baseUrl,
@@ -355,45 +326,21 @@ class EmbyApiClient {
           },
         ),
       );
-    } catch (e) {
-      // 忽略报告失败
-    }
+    } catch (e) {}
   }
 
   Future<void> markPlayed(String itemId) async {
     if (_baseUrl == null || _accessToken == null) return;
-    
     try {
-      await _dio.post(
-        '$_baseUrl/Users/$_userId/PlayedItems/$itemId',
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
-    } catch (e) {
-      // 忽略失败
-    }
+      await _dio.post('$_baseUrl/Users/$_userId/PlayedItems/$itemId');
+    } catch (e) {}
   }
 
   Future<void> markUnplayed(String itemId) async {
     if (_baseUrl == null || _accessToken == null) return;
-    
     try {
-      await _dio.delete(
-        '$_baseUrl/Users/$_userId/PlayedItems/$itemId',
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
-    } catch (e) {
-      // 忽略失败
-    }
+      await _dio.delete('$_baseUrl/Users/$_userId/PlayedItems/$itemId');
+    } catch (e) {}
   }
 
   Future<List<MediaItem>> search(String query, {List<String>? types}) async {
@@ -428,10 +375,7 @@ class EmbyApiClient {
     }
   }
 
-  Future<List<MediaItem>> getRecentlyAdded({
-    String? parentId,
-    int limit = 20,
-  }) async {
+  Future<List<MediaItem>> getRecentlyAdded({String? parentId, int limit = 20}) async {
     if (_baseUrl == null || _accessToken == null) {
       throw Exception('请先连接到 Emby 服务器');
     }
@@ -461,10 +405,7 @@ class EmbyApiClient {
     }
   }
 
-  Future<List<MediaItem>> getResumeItems({
-    String? parentId,
-    int limit = 20,
-  }) async {
+  Future<List<MediaItem>> getResumeItems({String? parentId, int limit = 20}) async {
     if (_baseUrl == null || _accessToken == null) {
       throw Exception('请先连接到 Emby 服务器');
     }
