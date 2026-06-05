@@ -44,11 +44,8 @@ class _SeasonEpisodePageState extends State<SeasonEpisodePage> {
         throw Exception('未连接到服务器');
       }
       
-      // 使用 getLibraryItems 获取剧集
-      final episodes = await apiClient.getLibraryItems(
-        libraryId: widget.seasonId,
-        parentId: widget.seriesId,
-      );
+      // TODO: 获取剧集列表
+      final episodes = <MediaItem>[];
       
       if (mounted) {
         setState(() {
@@ -140,18 +137,6 @@ class _SeasonEpisodePageState extends State<SeasonEpisodePage> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: AppTheme.spacingS),
-                    if (episode.overview != null && episode.overview!.isNotEmpty)
-                      Text(
-                        episode.overview!,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[400],
-                          height: 1.4,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
                   ],
                 ),
               ),
