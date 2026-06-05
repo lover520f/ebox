@@ -15,102 +15,108 @@ import 'page_transitions.dart';
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/',
-    debugLogDiagnostics: false, // 关闭日志提升性能
-    pageBuilder: (context, state) {
-      // 应用流畅的页面过渡动画
-      return CustomTransitionPage(
-        key: state.pageKey,
-        child: _buildPage(state),
-        transitionsBuilder: SmoothPageTransitions.buildPageTransition,
-        transitionDuration: const Duration(milliseconds: 280),
-        reverseTransitionDuration: const Duration(milliseconds: 250),
-      );
-    },
+    debugLogDiagnostics: false,
     routes: [
       GoRoute(
         path: '/',
         name: 'welcome',
-        builder: (context, state) => const WelcomePage(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const WelcomePage(),
+          transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+          transitionDuration: const Duration(milliseconds: 280),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+        ),
       ),
       GoRoute(
         path: '/home',
         name: 'home',
-        builder: (context, state) => const HomePage(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const HomePage(),
+          transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+          transitionDuration: const Duration(milliseconds: 280),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+        ),
       ),
       GoRoute(
         path: '/servers',
         name: 'servers',
-        builder: (context, state) => const ServerListPage(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const ServerListPage(),
+          transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+          transitionDuration: const Duration(milliseconds: 280),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+        ),
       ),
       GoRoute(
         path: '/servers/add',
         name: 'server-add',
-        builder: (context, state) => const ServerAddPage(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const ServerAddPage(),
+          transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+          transitionDuration: const Duration(milliseconds: 280),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+        ),
       ),
       GoRoute(
         path: '/library/:libraryId',
         name: 'library',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final libraryId = state.pathParameters['libraryId']!;
-          return LibraryPage(libraryId: libraryId);
+          return CustomTransitionPage(
+            child: LibraryPage(libraryId: libraryId),
+            transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+            transitionDuration: const Duration(milliseconds: 280),
+            reverseTransitionDuration: const Duration(milliseconds: 250),
+          );
         },
       ),
       GoRoute(
         path: '/detail/:mediaId',
         name: 'detail',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final mediaId = state.pathParameters['mediaId']!;
-          return MediaDetailPage(mediaId: mediaId);
+          return CustomTransitionPage(
+            child: MediaDetailPage(mediaId: mediaId),
+            transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+            transitionDuration: const Duration(milliseconds: 280),
+            reverseTransitionDuration: const Duration(milliseconds: 250),
+          );
         },
       ),
       GoRoute(
         path: '/player',
         name: 'player',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final itemId = state.uri.queryParameters['itemId'];
           final serverId = state.uri.queryParameters['serverId'];
-          return VideoPlayerPage(
-            itemId: itemId!,
-            serverId: serverId!,
+          return CustomTransitionPage(
+            child: VideoPlayerPage(itemId: itemId!, serverId: serverId!),
+            transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+            transitionDuration: const Duration(milliseconds: 280),
+            reverseTransitionDuration: const Duration(milliseconds: 250),
           );
         },
       ),
       GoRoute(
         path: '/settings',
         name: 'settings',
-        builder: (context, state) => const SettingsPage(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const SettingsPage(),
+          transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+          transitionDuration: const Duration(milliseconds: 280),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+        ),
       ),
       GoRoute(
         path: '/local',
         name: 'local',
-        builder: (context, state) => const LocalMediaPage(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const LocalMediaPage(),
+          transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+          transitionDuration: const Duration(milliseconds: 280),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+        ),
       ),
     ],
   );
-
-  static Widget _buildPage(GoRouterState state) {
-    final route = router.routeInformationProvider.value.uri.path;
-    
-    if (route == '/') return const WelcomePage();
-    if (route == '/home') return const HomePage();
-    if (route == '/servers') return const ServerListPage();
-    if (route == '/servers/add') return const ServerAddPage();
-    if (route.startsWith('/library/')) {
-      final libraryId = state.pathParameters['libraryId']!;
-      return LibraryPage(libraryId: libraryId);
-    }
-    if (route.startsWith('/detail/')) {
-      final mediaId = state.pathParameters['mediaId']!;
-      return MediaDetailPage(mediaId: mediaId);
-    }
-    if (route == '/player') {
-      final itemId = state.uri.queryParameters['itemId'];
-      final serverId = state.uri.queryParameters['serverId'];
-      return VideoPlayerPage(itemId: itemId!, serverId: serverId!);
-    }
-    if (route == '/settings') return const SettingsPage();
-    if (route == '/local') return const LocalMediaPage();
-    
-    return const WelcomePage();
-  }
 }
