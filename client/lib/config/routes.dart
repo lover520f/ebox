@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../pages/welcome/welcome_page.dart';
@@ -9,10 +10,22 @@ import '../pages/detail/media_detail_page.dart';
 import '../pages/player/video_player_page.dart';
 import '../pages/settings/settings_page.dart';
 import '../pages/local/local_media_page.dart';
+import 'page_transitions.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/',
+    debugLogDiagnostics: false, // 关闭日志提升性能
+    pageBuilder: (context, state) {
+      // 应用流畅的页面过渡动画
+      return CustomTransitionPage(
+        key: state.pageKey,
+        child: _buildPage(state),
+        transitionsBuilder: SmoothPageTransitions.buildPageTransition,
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 250),
+      );
+    },
     routes: [
       GoRoute(
         path: '/',
@@ -74,4 +87,30 @@ class AppRouter {
       ),
     ],
   );
+
+  static Widget _buildPage(GoRouterState state) {
+    final route = router.routeInformationProvider.value.uri.path;
+    
+    if (route == '/') return const WelcomePage();
+    if (route == '/home') return const HomePage();
+    if (route == '/servers') return const ServerListPage();
+    if (route == '/servers/add') return const ServerAddPage();
+    if (route.startsWith('/library/')) {
+      final libraryId = state.pathParameters['libraryId']!;
+      return LibraryPage(libraryId: libraryId);
+    }
+    if (route.startsWith('/detail/')) {
+      final mediaId = state.pathParameters['mediaId']!;
+      return MediaDetailPage(mediaId: mediaId);
+    }
+    if (route == '/player') {
+      final itemId = state.uri.queryParameters['itemId'];
+      final serverId = state.uri.queryParameters['serverId'];
+      return VideoPlayerPage(itemId: itemId!, serverId: serverId!);
+    }
+    if (route == '/settings') return const SettingsPage();
+    if (route == '/local') return const LocalMediaPage();
+    
+    return const WelcomePage();
+  }
 }

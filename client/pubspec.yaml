@@ -44,6 +44,7 @@ dependencies:
   
   # UI 组件
   cached_network_image: ^3.3.1
+  flutter_cache_manager: ^3.3.1
   flutter_slidable: ^3.0.1
   
   # 窗口适配 (桌面端)
