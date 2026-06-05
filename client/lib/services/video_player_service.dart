@@ -180,3 +180,19 @@ class VideoPlayerService extends ChangeNotifier {
     super.dispose();
   }
 }
+
+  // 字幕和音轨相关
+  List<SubtitleStream> _subtitles = [];
+  List<AudioStream> _audioTracks = [];
+
+  List<SubtitleStream> get subtitles => _subtitles;
+  List<AudioStream> get audioTracks => _audioTracks;
+
+  void setMediaStreams({
+    List<SubtitleStream> subtitles = const [],
+    List<AudioStream> audioTracks = const [],
+  }) {
+    _subtitles = subtitles;
+    _audioTracks = audioTracks;
+    notifyListeners();
+  }

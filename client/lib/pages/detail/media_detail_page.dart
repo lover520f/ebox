@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-
 import '../../config/theme.dart';
 import '../../models/media_item.dart';
 import '../../providers/media_provider.dart';
@@ -27,8 +26,10 @@ class MediaDetailPage extends StatefulWidget {
 
 class _MediaDetailPageState extends State<MediaDetailPage> {
   MediaItem? _mediaItem;
+  List<MediaItem> _seasons = [];
   bool _isLoading = true;
   bool _isPlaying = false;
+  String? _selectedSeasonId;
 
   @override
   void initState() {
@@ -54,6 +55,18 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
 
     try {
       _mediaItem = await apiClient.getItemDetail(widget.itemId);
+      
+      // 如果是电视剧，加载季列表
+      if (_mediaItem?.type == 'Season' || _mediaItem?.type == 'Series') {
+        final seasons = await apiClient.getLibraryItems(
+          libraryId: widget.itemId,
+          mediaType: 'Season',
+        );
+        if (seasons.isNotEmpty) {
+          _seasons = seasons;
+          _selectedSeasonId = seasons.first.id;
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -195,12 +208,20 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
               ),
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.more_vert),
-                onPressed: () {
-                  // TODO: 更多操作
-                },
-              ),
+              if (_seasons.isNotEmpty)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.layers),
+                  tooltip: '选择季',
+                  onSelected: (seasonId) {
+                    setState(() => _selectedSeasonId = seasonId);
+                  },
+                  itemBuilder: (context) => _seasons.map((season) {
+                    return PopupMenuItem(
+                      value: season.id,
+                      child: Text(season.name ?? '未命名'),
+                    );
+                  }).toList(),
+                ),
             ],
           ),
           
@@ -240,12 +261,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                         _buildMetadataChip(
                           Icons.access_time,
                           _mediaItem!.displayDuration,
-                        ),
-                      ],
-                      if (_mediaItem!.officialRating != null) ...[
-                        _buildMetadataChip(
-                          Icons.info,
-                          _mediaItem!.officialRating!,
                         ),
                       ],
                     ],
@@ -298,6 +313,30 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                     const SizedBox(height: AppTheme.spacingL),
                   ],
                   
+                  // 季列表
+                  if (_seasons.isNotEmpty) ...[
+                    const Text(
+                      '季',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppTheme.spacingM),
+                    SizedBox(
+                      height: 180,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _seasons.length,
+                        itemBuilder: (context, index) {
+                          final season = _seasons[index];
+                          return _buildSeasonCard(season);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: AppTheme.spacingL),
+                  ],
+                  
                   if (_mediaItem!.genres != null && _mediaItem!.genres!.isNotEmpty) ...[
                     const Text(
                       '类型',
@@ -317,7 +356,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                         );
                       }).toList(),
                     ),
-                    const SizedBox(height: AppTheme.spacingL),
                   ],
                   const SizedBox(height: AppTheme.spacingXL),
                 ],
@@ -325,6 +363,56 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSeasonCard(MediaItem season) {
+    final serverProvider = context.watch<ServerProvider>();
+    final serverUrl = serverProvider.activeServer?.url;
+    
+    String? imageUrl;
+    if (serverUrl != null && season.imageTags?.isNotEmpty == true) {
+      imageUrl = '$serverUrl/Items/${season.id}/Images/Primary?tag=${season.imageTags!.values.first}';
+    }
+
+    return Container(
+      width: 120,
+      margin: const EdgeInsets.only(right: AppTheme.spacingM),
+      child: InkWell(
+        onTap: () {
+          context.push('/season/${widget.itemId}/${season.id}', queryParameters: {
+            'name': season.name ?? '季',
+          });
+        },
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+              child: AspectRatio(
+                aspectRatio: 2 / 3,
+                child: imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        color: AppTheme.primaryColor.withOpacity(0.2),
+                        child: const Icon(Icons.video_library, size: 40),
+                      ),
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingS),
+            Text(
+              season.name ?? '未命名',
+              style: const TextStyle(fontSize: 14),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
