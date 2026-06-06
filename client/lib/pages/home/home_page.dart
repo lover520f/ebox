@@ -211,7 +211,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildHomeContent() {
     return Consumer<ServerProvider>(
-      builder: (context, serverProvider) {
+      builder: (context, serverProvider, child) {
         final isConnected = serverProvider.activeServer != null;
         
         if (!isConnected) {
