@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
-
 import '../../config/theme.dart';
 import '../../providers/server_provider.dart';
 import '../../models/emby_server.dart';
 
 class ServerAddPage extends StatefulWidget {
-  const ServerAddPage({super.key});
+  const ServerAddPage({Key? key}) : super(key: key);
 
   @override
   State<ServerAddPage> createState() => _ServerAddPageState();
@@ -23,7 +21,6 @@ class _ServerAddPageState extends State<ServerAddPage> {
   
   bool _isLoading = false;
   bool _showAdvanced = false;
-  String? _errorMessage;
 
   @override
   void dispose() {
@@ -37,29 +34,64 @@ class _ServerAddPageState extends State<ServerAddPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            context.pop();
-          },
-        ),
         title: const Text('添加服务器'),
+        backgroundColor: const Color(0xFF141414),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.pop(),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppTheme.spacingL),
+        padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 标题
+              const Text(
+                '连接 Emby 服务器',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '输入服务器信息以建立连接',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[400],
+                ),
+              ),
+              const SizedBox(height: 32),
+              
               // 服务器地址
               TextFormField(
                 controller: _urlController,
-                decoration: const InputDecoration(
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                decoration: InputDecoration(
                   labelText: '服务器地址',
-                  hintText: 'http://192.168.1.100:8096',
-                  prefixIcon: Icon(Icons.dns),
+                  hintText: '例如：http://192.168.1.100:8096',
+                  labelStyle: TextStyle(color: Colors.grey[400]),
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  prefixIcon: const Icon(Icons.cloud, color: Color(0xFF6C5CE7)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey[700]!),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey[700]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF6C5CE7), width: 2),
+                  ),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -71,102 +103,169 @@ class _ServerAddPageState extends State<ServerAddPage> {
                   return null;
                 },
               ),
-              const SizedBox(height: AppTheme.spacingM),
+              const SizedBox(height: 16),
               
-              // 服务器名称
+              // 服务器名称（可选）
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: '服务器名称',
-                  hintText: '我家里的 Emby',
-                  prefixIcon: Icon(Icons.label),
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                decoration: InputDecoration(
+                  labelText: '服务器名称（可选）',
+                  hintText: '例如：我家 Emby',
+                  labelStyle: TextStyle(color: Colors.grey[400]),
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  prefixIcon: const Icon(Icons.label, color: Color(0xFF6C5CE7)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey[700]!),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey[700]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF6C5CE7), width: 2),
+                  ),
                 ),
               ),
-              const SizedBox(height: AppTheme.spacingM),
+              const SizedBox(height: 24),
               
-              // 高级选项
-              TextButton(
-                onPressed: () {
+              // 高级选项开关
+              InkWell(
+                onTap: () {
                   setState(() {
                     _showAdvanced = !_showAdvanced;
                   });
                 },
-                child: Text(_showAdvanced ? '隐藏高级选项' : '显示高级选项'),
+                child: Row(
+                  children: [
+                    Icon(
+                      _showAdvanced ? Icons.expand_more : Icons.chevron_right,
+                      color: const Color(0xFF6C5CE7),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '高级选项',
+                      style: TextStyle(
+                        color: Color(0xFF6C5CE7),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               
+              // 高级选项
               if (_showAdvanced) ...[
+                const SizedBox(height: 16),
                 // 用户名
                 TextFormField(
                   controller: _usernameController,
-                  decoration: const InputDecoration(
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  decoration: InputDecoration(
                     labelText: '用户名',
-                    prefixIcon: Icon(Icons.person),
+                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    prefixIcon: const Icon(Icons.person, color: Color(0xFF6C5CE7)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF6C5CE7), width: 2),
+                    ),
                   ),
                 ),
-                const SizedBox(height: AppTheme.spacingM),
-                
+                const SizedBox(height: 16),
                 // 密码
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
-                  decoration: const InputDecoration(
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  decoration: InputDecoration(
                     labelText: '密码',
-                    prefixIcon: Icon(Icons.lock),
+                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    prefixIcon: const Icon(Icons.lock, color: Color(0xFF6C5CE7)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF6C5CE7), width: 2),
+                    ),
                   ),
                 ),
-                const SizedBox(height: AppTheme.spacingM),
               ],
-              
-              // 错误信息
-              if (_errorMessage != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(AppTheme.spacingM),
-                  decoration: BoxDecoration(
-                    color: AppTheme.errorColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: AppTheme.errorColor),
-                      const SizedBox(width: AppTheme.spacingM),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: AppTheme.errorColor),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppTheme.spacingM),
-              ],
-              
-              const SizedBox(height: AppTheme.spacingL),
+              const SizedBox(height: 32),
               
               // 测试连接按钮
-              OutlinedButton.icon(
-                onPressed: _isLoading ? null : _testConnection,
-                icon: const Icon(Icons.wifi),
-                label: const Text('测试连接'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingM),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _testConnection,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C5CE7)),
+                          ),
+                        )
+                      : const Icon(Icons.wifi, color: Color(0xFF6C5CE7)),
+                  label: Text(
+                    _isLoading ? '测试中...' : '测试连接',
+                    style: const TextStyle(
+                      color: Color(0xFF6C5CE7),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF6C5CE7), width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: AppTheme.spacingM),
+              const SizedBox(height: 16),
               
               // 保存按钮
-              ElevatedButton.icon(
-                onPressed: _isLoading ? null : _saveServer,
-                icon: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save),
-                label: Text(_isLoading ? '保存中...' : '保存'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingM),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _saveServer,
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text(
+                    '保存',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6C5CE7),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -177,84 +276,87 @@ class _ServerAddPageState extends State<ServerAddPage> {
   }
 
   Future<void> _testConnection() async {
-    final url = _urlController.text.trim();
+    if (!_formKey.currentState!.validate()) return;
     
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+    setState(() => _isLoading = true);
+    
     try {
-      final success = await context.read<ServerProvider>().testConnection(url);
+      final serverProvider = context.read<ServerProvider>();
+      final url = _urlController.text.trim();
       
-      if (success) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('连接成功！'),
-              backgroundColor: AppTheme.successColor,
-            ),
-          );
-        }
-      } else {
-        setState(() {
-          _errorMessage = '无法连接到服务器，请检查地址是否正确';
-        });
+      final success = await serverProvider.testServerUrl(url);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? '连接成功！' : '连接失败，请检查地址'),
+            backgroundColor: success ? Colors.green : Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = '连接失败：$e';
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('错误：$e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _saveServer() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+    if (!_formKey.currentState!.validate()) return;
+    
+    setState(() => _isLoading = true);
+    
     try {
+      final serverProvider = context.read<ServerProvider>();
+      
       final server = EmbyServer(
-        id: const Uuid().v4(),
-        name: _nameController.text.trim().isEmpty ? 'Emby 服务器' : _nameController.text.trim(),
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: _nameController.text.trim().isEmpty 
+            ? 'Emby 服务器' 
+            : _nameController.text.trim(),
         url: _urlController.text.trim(),
-        username: _usernameController.text.trim().isEmpty 
-            ? null 
-            : _usernameController.text.trim(),
-        password: _passwordController.text.trim().isEmpty 
-            ? null 
-            : _passwordController.text.trim(),
-        isActive: false,
+        username: _usernameController.text.trim(),
+        isOnline: true,
       );
-
-      await context.read<ServerProvider>().addServer(server);
-
+      
+      await serverProvider.addServer(server);
+      serverProvider.setActiveServer(server);
+      
       if (mounted) {
+        context.pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('服务器已保存'),
-            backgroundColor: AppTheme.successColor,
+            content: Text('服务器已添加'),
+            backgroundColor: Color(0xFF6C5CE7),
+            behavior: SnackBarBehavior.floating,
           ),
         );
-        context.goNamed('servers');
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = '保存失败：$e';
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('添加失败：$e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 }
