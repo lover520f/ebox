@@ -1,93 +1,170 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
-import 'dart:async';
-
+import 'package:go_router/go_router.dart';
 import '../../config/theme.dart';
+import '../../services/local_media_service.dart';
 import '../../models/media_item.dart';
+import '../../providers/player_provider.dart';
 import '../../widgets/media_card.dart';
 
 class LocalMediaPage extends StatefulWidget {
-  const LocalMediaPage({super.key});
+  const LocalMediaPage({Key? key}) : super(key: key);
 
   @override
   State<LocalMediaPage> createState() => _LocalMediaPageState();
 }
 
 class _LocalMediaPageState extends State<LocalMediaPage> {
-  String? _scanPath;
-  List<MediaItem> _videos = [];
+  final LocalMediaService _localMediaService = LocalMediaService();
+  int _selectedTab = 0;
   bool _isScanning = false;
-  int _gridColumns = 4;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            context.pop();
-          },
-        ),
-        title: const Text('本地媒体'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.folder_open),
-            onPressed: _selectFolder,
-            tooltip: '选择文件夹',
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _scanPath != null ? _scanLocalFiles : null,
-            tooltip: '重新扫描',
-          ),
-          PopupMenuButton<int>(
-            onSelected: (value) {
-              setState(() => _gridColumns = value);
-            },
-            itemBuilder: (context) => [
-              _buildColumnMenuItem(2),
-              _buildColumnMenuItem(3),
-              _buildColumnMenuItem(4),
-              _buildColumnMenuItem(5),
-              _buildColumnMenuItem(6),
-            ],
+      backgroundColor: const Color(0xFF0A0A0A),
+      body: Row(
+        children: [
+          _buildSideNavigation(),
+          Expanded(
+            child: Column(
+              children: [
+                _buildTopBar(),
+                Expanded(child: _buildContent()),
+              ],
+            ),
           ),
         ],
       ),
-      body: _buildContent(),
+    );
+  }
+
+  Widget _buildSideNavigation() {
+    return Container(
+      width: 240,
+      decoration: BoxDecoration(
+        color: const Color(0xFF141414),
+        border: Border(
+          right: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6C5CE7), Color(0xFF00CEC9)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.folder, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Text('本地媒体', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              ],
+            ),
+          ),
+          _buildNavItem('全部', 0, Icons.folder_rounded),
+          _buildNavItem('电影', 1, Icons.movie_rounded),
+          _buildNavItem('剧集', 2, Icons.tv_rounded),
+          const Spacer(),
+          _buildNavItem('扫描', -1, Icons.refresh_rounded, isAction: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem(String title, int index, IconData icon, {bool isAction = false}) {
+    final isSelected = _selectedTab == index;
+    return ListTile(
+      leading: Icon(icon, color: isSelected ? const Color(0xFF6C5CE7) : Colors.grey[400], size: 24),
+      title: Text(title, style: TextStyle(color: isSelected ? Colors.white : Colors.grey[400], fontSize: 15)),
+      selected: isSelected,
+      selectedTileColor: const Color(0xFF6C5CE7).withOpacity(0.15),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      onTap: () {
+        if (isAction) {
+          _startScan();
+        } else {
+          setState(() => _selectedTab = index);
+        }
+      },
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1))),
+      ),
+      child: Row(
+        children: [
+          const Text('本地媒体库', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+          const Spacer(),
+          ElevatedButton.icon(
+            onPressed: _addDirectory,
+            icon: const Icon(Icons.add_folder),
+            label: const Text('添加目录'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C5CE7),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildContent() {
-    if (_scanPath == null) {
+    if (_isScanning) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C5CE7))),
+            SizedBox(height: 16),
+            Text('正在扫描媒体库...', style: TextStyle(color: Colors.white70)),
+          ],
+        ),
+      );
+    }
+
+    final mediaList = _getMediaList();
+    if (mediaList.isEmpty) {
       return _buildEmptyState();
     }
 
-    if (_isScanning) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_videos.isEmpty) {
-      return _buildNoVideosState();
-    }
-
     return GridView.builder(
-      padding: const EdgeInsets.all(AppTheme.spacingM),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: _gridColumns,
-        childAspectRatio: 2 / 3,
-        crossAxisSpacing: AppTheme.spacingM,
-        mainAxisSpacing: AppTheme.spacingM,
+      padding: const EdgeInsets.all(24),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 5,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 0.65,
       ),
-      itemCount: _videos.length,
-      itemBuilder: (context, index) {
-        return MediaCard(item: _videos[index]);
-      },
+      itemCount: mediaList.length,
+      itemBuilder: (context, index) => LocalMediaCard(item: mediaList[index]),
     );
+  }
+
+  List<MediaItem> _getMediaList() {
+    switch (_selectedTab) {
+      case 0: return _localMediaService.getAllMedia();
+      case 1: return _localMediaService.getMovies();
+      case 2: return _localMediaService.getSeries();
+      default: return [];
+    }
   }
 
   Widget _buildEmptyState() {
@@ -95,54 +172,27 @@ class _LocalMediaPageState extends State<LocalMediaPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.folder_open,
-            size: 80,
-            color: AppTheme.textSecondary,
-          ),
-          const SizedBox(height: AppTheme.spacingL),
-          const Text(
-            '请选择要扫描的文件夹',
-            style: TextStyle(
-              fontSize: 20,
-              color: AppTheme.textPrimary,
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Color(0xFF6C5CE7), Color(0xFF00CEC9)]),
+              borderRadius: BorderRadius.circular(60),
             ),
+            child: Icon(Icons.folder_open, size: 60, color: Colors.white.withOpacity(0.8)),
           ),
-          const SizedBox(height: AppTheme.spacingM),
+          const SizedBox(height: 32),
+          const Text('暂无本地媒体', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 12),
+          Text('点击"添加目录"来选择媒体文件夹', style: TextStyle(fontSize: 16, color: Colors.grey[400])),
+          const SizedBox(height: 32),
           ElevatedButton.icon(
-            onPressed: _selectFolder,
-            icon: const Icon(Icons.folder),
-            label: const Text('选择文件夹'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNoVideosState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.video_library_outlined,
-            size: 80,
-            color: AppTheme.textSecondary,
-          ),
-          const SizedBox(height: AppTheme.spacingL),
-          const Text(
-            '未发现视频文件',
-            style: TextStyle(
-              fontSize: 20,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: AppTheme.spacingS),
-          Text(
-            '文件夹：$_scanPath',
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppTheme.textSecondary,
+            onPressed: _addDirectory,
+            icon: const Icon(Icons.add_folder),
+            label: const Text('添加目录', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C5CE7),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             ),
           ),
         ],
@@ -150,109 +200,85 @@ class _LocalMediaPageState extends State<LocalMediaPage> {
     );
   }
 
-  Future<void> _selectFolder() async {
+  Future<void> _addDirectory() async {
     try {
-      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
-      
-      if (selectedDirectory != null) {
-        setState(() {
-          _scanPath = selectedDirectory;
-        });
-        await _scanLocalFiles();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('选择文件夹失败：$e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _scanLocalFiles() async {
-    if (_scanPath == null) return;
-
-    setState(() {
-      _isScanning = true;
-    });
-
-    try {
-      final directory = Directory(_scanPath!);
-      final videoExtensions = ['.mp4', '.mkv', '.avi', '.wmv', '.flv', '.mov'];
-      
-      List<MediaItem> foundVideos = [];
-      
-      await for (var entity in directory.list(recursive: true)) {
-        if (entity is File) {
-          final extension = entity.path.substring(entity.path.lastIndexOf('.')).toLowerCase();
-          if (videoExtensions.contains(extension)) {
-            // 从文件名提取信息
-            final fileName = entity.path.split(Platform.pathSeparator).last;
-            final title = _parseTitleFromFileName(fileName);
-            
-            foundVideos.add(MediaItem(
-              id: entity.path,
-              name: title,
-              type: 'Movie',
-              productionYear: _parseYearFromFileName(fileName),
-            ));
-          }
+      final directory = await FilePicker.platform.getDirectoryPath();
+      if (directory != null) {
+        await _localMediaService.addMediaDirectory(directory);
+        setState(() {});
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('已添加：$directory'), backgroundColor: const Color(0xFF6C5CE7)),
+          );
         }
       }
-
-      setState(() {
-        _videos = foundVideos;
-        _isScanning = false;
-      });
     } catch (e) {
-      if (mounted) {
+      debugPrint('添加目录失败：$e');
+    }
+  }
+
+  Future<void> _startScan() async {
+    setState(() => _isScanning = true);
+    await _localMediaService.rescan();
+    setState(() => _isScanning = false);
+  }
+}
+
+class LocalMediaCard extends StatelessWidget {
+  final MediaItem item;
+
+  const LocalMediaCard({Key? key, required this.item}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        final playerProvider = context.read<PlayerProvider>();
+        playerProvider.playLocalMedia(item);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('扫描失败：$e')),
+          SnackBar(content: Text('开始播放：${item.name}'), backgroundColor: const Color(0xFF6C5CE7)),
         );
-      }
-      setState(() {
-        _isScanning = false;
-      });
-    }
-  }
-
-  String _parseTitleFromFileName(String fileName) {
-    // 移除扩展名
-    var title = fileName.substring(0, fileName.lastIndexOf('.'));
-    
-    // 移除年份
-    title = title.replaceAll(RegExp(r'\(\d{4}\)'), '');
-    title = title.replaceAll(RegExp(r'\[\d{4}\]'), '');
-    
-    // 移除常见标记
-    title = title.replaceAll(RegExp(r'\.|\-|_'), ' ');
-    title = title.replaceAll(RegExp(r'\d{3,4}p'), '');
-    title = title.replaceAll('BluRay', '');
-    title = title.replaceAll('DVDRip', '');
-    
-    // 清理多余空格
-    title = title.trim();
-    title = title.replaceAll(RegExp(r'\s+'), ' ');
-    
-    return title;
-  }
-
-  int? _parseYearFromFileName(String fileName) {
-    // 尝试从文件名中提取年份
-    final match = RegExp(r'[\(\[](\d{4})[\)\]]').firstMatch(fileName);
-    if (match != null) {
-      return int.tryParse(match.group(1)!);
-    }
-    return null;
-  }
-
-  PopupMenuItem<int> _buildColumnMenuItem(int columns) {
-    return PopupMenuItem(
-      value: columns,
-      child: ListTile(
-        leading: Icon(_gridColumns == columns ? Icons.check : Icons.view_module),
-        title: Text('$columns 列'),
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF141414),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF6C5CE7), Color(0xFF00CEC9)]),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: const Center(
+                  child: Icon(Icons.video_file, size: 60, color: Colors.white70),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.name, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Text(_formatSize(item.size ?? 0), style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }
