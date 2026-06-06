@@ -6,7 +6,7 @@ import '../pages/home/home_page.dart';
 import '../pages/server/server_list_page.dart';
 import '../pages/server/server_add_page.dart';
 import '../pages/library/library_page.dart';
-import '../pages/detail/media_detail_page.dart';
+import '../pages/media/media_detail_page.dart';
 import '../pages/playback/video_player_page.dart';
 import '../pages/settings/settings_page.dart';
 import '../pages/local/local_media_page.dart';
@@ -85,14 +85,12 @@ class AppRouter {
         ),
       ),
       GoRoute(
-        path: '/detail/:itemId',
-        name: 'detail',
+        path: '/media/:itemId',
+        name: 'media-detail',
         pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>?;
+          final item = state.extra as dynamic;
           return CustomTransitionPage(
-            child: MediaDetailPage(
-              itemId: state.pathParameters['itemId']!,
-            ),
+            child: MediaDetailPage(item: item),
             transitionsBuilder: SmoothPageTransitions.buildPageTransition,
             transitionDuration: const Duration(milliseconds: 280),
             reverseTransitionDuration: const Duration(milliseconds: 250),
@@ -100,15 +98,14 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: '/player/:itemId',
+        path: '/player',
         name: 'player',
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>;
           return CustomTransitionPage(
             child: VideoPlayerPage(
-              videoUrl: extra['videoUrl'] as String,
-              itemId: state.pathParameters['itemId']!,
-              title: extra['title'] as String? ?? '视频播放',
+              item: extra['item']!,
+              playPosition: extra['playPosition'] as int? ?? 0,
             ),
             transitionsBuilder: SmoothPageTransitions.buildPageTransition,
             transitionDuration: const Duration(milliseconds: 280),
@@ -139,7 +136,7 @@ class AppRouter {
       GoRoute(
         path: '/settings',
         name: 'settings',
-        pageBuilder: (context, state) => CustomTransitionPage(
+        pageBuilder: (context, state) => CustomTransferPage(
           child: const SettingsPage(),
           transitionsBuilder: SmoothPageTransitions.buildPageTransition,
           transitionDuration: const Duration(milliseconds: 280),

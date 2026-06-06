@@ -2,22 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
+import '../../models/media_item.dart';
 import '../../services/video_player_service.dart';
 import '../../services/emby_api_client.dart';
 import '../../widgets/advanced_player_controls.dart';
 
-/// 完整的视频播放页面
-/// 支持全屏、播放报告、快捷键控制
 class VideoPlayerPage extends StatefulWidget {
-  final String videoUrl;
-  final String itemId;
-  final String title;
+  final MediaItem item;
+  final int playPosition;
 
   const VideoPlayerPage({
     Key? key,
-    required this.videoUrl,
-    required this.itemId,
-    required this.title,
+    required this.item,
+    this.playPosition = 0,
   }) : super(key: key);
 
   @override
@@ -27,6 +24,8 @@ class VideoPlayerPage extends StatefulWidget {
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
   late VideoPlayerService _player;
   bool _isFullScreen = false;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -38,29 +37,68 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Future<void> _initializePlayer() async {
     _player = context.read<VideoPlayerService>();
     
-    // 设置 API 客户端用于播放报告
     final embyClient = context.read<EmbyApiClient>();
     _player.setApiClient(embyClient);
     
-    // 进入全屏模式
     await _enterFullScreen();
     
-    // 隐藏系统 UI
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
     
-    // 初始化视频
     try {
-      await _player.initialize(widget.videoUrl, itemId: widget.itemId);
+      final playbackInfo = await embyClient.getPlaybackInfo(widget.item.id);
+      
+      if (playbackInfo == null) {
+        setState(() {
+          _errorMessage = '无法获取播放信息';
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      final mediaSources = playbackInfo['MediaSources'] as List?;
+      if (mediaSources == null || mediaSources.isEmpty) {
+        setState(() {
+          _errorMessage = '无可用媒体源';
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      final mediaSource = mediaSources.first;
+      final playUrl = mediaSource['DirectStreamUrl'] as String? ?? 
+                      mediaSource['TranscodingUrl'] as String?;
+      
+      if (playUrl == null) {
+        setState(() {
+          _errorMessage = '无法获取播放地址';
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      final fullUrl = playUrl.startsWith('http') 
+          ? playUrl 
+          : '${embyClient.baseUrl}$playUrl';
+      
+      await _player.initialize(fullUrl, itemId: widget.item.id);
       await _player.play();
+      
+      if (widget.playPosition > 0) {
+        final position = Duration(microseconds: widget.playPosition ~/ 10);
+        await _player.seekTo(position);
+      }
+      
+      setState(() => _isLoading = false);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('播放失败：$e')),
-        );
+        setState(() {
+          _errorMessage = '播放失败：$e';
+          _isLoading = false;
+        });
       }
     }
   }
@@ -73,7 +111,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         if (_isFullScreen) {
           _exitFullScreen();
         } else {
-          Navigator.of(context).pop();
+          _handleBack();
         }
         return;
       }
@@ -102,113 +140,128 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         _player.setVolume(_player.volume - 0.1);
         return;
       }
+      
+      if (event is RawKeyDownEvent && 
+          (event.logicalKey == LogicalKeyboardKey.keyM || 
+           event.logicalKey == LogicalKeyboardKey.keyK)) {
+        _player.toggleMute();
+        return;
+      }
+      
+      if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyF) {
+        if (_isFullScreen) {
+          _exitFullScreen();
+        } else {
+          _enterFullScreen();
+        }
+        return;
+      }
     });
   }
 
   Future<void> _enterFullScreen() async {
-    setState(() {
-      _isFullScreen = true;
-    });
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    setState(() => _isFullScreen = true);
   }
 
   Future<void> _exitFullScreen() async {
-    setState(() {
-      _isFullScreen = false;
-    });
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations([
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
+    setState(() => _isFullScreen = false);
+  }
+
+  void _handleBack() {
+    Navigator.of(context).pop();
   }
 
   @override
   void dispose() {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     _player.dispose();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations([]);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C5CE7)),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                '正在加载 ${widget.item.name}...',
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+              const SizedBox(height: 24),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: _handleBack,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6C5CE7),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('返回'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
           Center(
             child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Consumer<VideoPlayerService>(
-                builder: (context, player, _) {
-                  if (!player.isVideoInitialized) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-                  return VideoPlayer(_player.controller!);
-                },
-              ),
+              aspectRatio: _player.aspectRatio ?? 16 / 9,
+              child: VideoPlayer(_player.controller),
             ),
           ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.black.withOpacity(0),
-                    Colors.black.withOpacity(0.8),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () {
-                      _exitFullScreen();
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: AdvancedPlayerControls(),
-          ),
-          Consumer<VideoPlayerService>(
-            builder: (context, player, _) {
-              if (!player.isInitialized || !player.isVideoInitialized) {
-                return const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                );
-              }
-              return const SizedBox.shrink();
-            },
+          AdvancedPlayerControls(
+            player: _player,
+            onBack: _handleBack,
+            title: widget.item.name,
           ),
         ],
       ),

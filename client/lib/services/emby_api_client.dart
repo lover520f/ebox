@@ -1,437 +1,556 @@
 import 'dart:convert';
-import 'package:dio/dio.dart';
-import '../models/emby_server.dart';
-import '../models/user.dart';
-import '../models/media_library.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../models/media_item.dart';
+import '../models/user_view.dart';
+import '../models/search_result.dart';
 
 class EmbyApiClient {
-  final Dio _dio = Dio();
-  String? _baseUrl;
-  String? _accessToken;
-  String? _userId;
-  User? _currentUser;
+  final String baseUrl;
+  final String? apiKey;
+  final String? userId;
+  final String? username;
+  final String? password;
 
-  String? get baseUrl => _baseUrl;
-  String? get accessToken => _accessToken;
-  String? get userId => _userId;
-  User? get currentUser => _currentUser;
-  Dio get dio => _dio;
+  EmbyApiClient({
+    required this.baseUrl,
+    this.apiKey,
+    this.userId,
+    this.username,
+    this.password,
+  });
 
-  Future<bool> testConnection(String url) async {
+  String get _authHeader => apiKey != null ? 'MediaBrowser Client="E 宝盒", Version="5.0.0", DeviceId="ebox-client", Token="$apiKey"' : '';
+  
+  String get imageUrl {
+    if (apiKey != null) {
+      return '$baseUrl/Items/[ITEM_ID]/Images/Primary?Tag=[TAG]&MaxWidth=400&api_key=$apiKey';
+    }
+    return '$baseUrl/Items/[ITEM_ID]/Images/Primary?Tag=[TAG]&MaxWidth=400';
+  }
+
+  String get backdropUrl {
+    if (apiKey != null) {
+      return '$baseUrl/Items/[ITEM_ID]/Images/Backdrop?MaxWidth=1920&api_key=$apiKey';
+    }
+    return '$baseUrl/Items/[ITEM_ID]/Images/Backdrop?MaxWidth=1920';
+  }
+
+  /// 获取用户视图（媒体库）
+  Future<List<UserView>> getUserViews() async {
     try {
-      final response = await _dio.get(
-        '$url/System/Info/Public',
-        options: Options(
-          sendTimeout: const Duration(seconds: 5),
-          receiveTimeout: const Duration(seconds: 5),
-        ),
-      );
+      final url = Uri.parse('$baseUrl/Users/$userId/Views?api_key=$apiKey');
+      final response = await http.get(url, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = data['Items'] as List? ?? [];
+        return items.map((item) => UserView.fromJson(item)).toList();
+      } else {
+        debugPrint('获取用户视图失败：${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('获取用户视图异常：$e');
+      return [];
+    }
+  }
+
+  /// 获取媒体库项目
+  Future<List<MediaItem>> getLibraryItems({
+    String? parentId,
+    String? includeItemTypes,
+    int limit = 50,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'SortBy': 'SortName',
+        'SortOrder': 'Ascending',
+        'IncludeItemTypes': includeItemTypes ?? 'Movie,Series,Episode',
+        'Recursive': 'true',
+        'Limit': limit.toString(),
+        'StartIndex': '0',
+        'ImageTypeLimit': '1',
+        'EnableImageTypes': 'Primary,Backdrop',
+      };
+
+      if (parentId != null && parentId.isNotEmpty) {
+        queryParams['ParentId'] = parentId;
+      }
+
+      final uri = Uri.parse('$baseUrl/Items').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = data['Items'] as List? ?? [];
+        return items.map((item) => MediaItem.fromJson(item)).toList();
+      } else {
+        debugPrint('获取媒体库失败：${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('获取媒体库异常：$e');
+      return [];
+    }
+  }
+
+  /// 获取继续观看的项目
+  Future<List<MediaItem>> getResumeItems({int limit = 50}) async {
+    try {
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'Limit': limit.toString(),
+        'SortBy': 'DatePlayed',
+        'SortOrder': 'Descending',
+        'IncludeItemTypes': 'Movie,Episode',
+        'Recursive': 'true',
+        'IsPlayed': 'false',
+        'ImageTypeLimit': '1',
+        'EnableImageTypes': 'Primary,Backdrop',
+      };
+
+      final uri = Uri.parse('$baseUrl/Users/$userId/Items/Resume').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = data['Items'] as List? ?? [];
+        return items.map((item) => MediaItem.fromJson(item)).toList();
+      } else {
+        debugPrint('获取续播项目失败：${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('获取续播项目异常：$e');
+      return [];
+    }
+  }
+
+  /// 获取最近添加的项目
+  Future<List<MediaItem>> getRecentlyAdded({int limit = 50}) async {
+    try {
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'Limit': limit.toString(),
+        'SortBy': 'DateCreated,SortName',
+        'SortOrder': 'Descending',
+        'IncludeItemTypes': 'Movie,Series,Episode',
+        'Recursive': 'true',
+        'ImageTypeLimit': '1',
+        'EnableImageTypes': 'Primary,Backdrop',
+      };
+
+      final uri = Uri.parse('$baseUrl/Users/$userId/Items/Latest').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = data['Items'] as List? ?? [];
+        return items.map((item) => MediaItem.fromJson(item)).toList();
+      } else {
+        debugPrint('获取最近添加失败：${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('获取最近添加异常：$e');
+      return [];
+    }
+  }
+
+  /// 获取项目详情
+  Future<MediaItem?> getItemById(String itemId) async {
+    try {
+      final url = Uri.parse('$baseUrl/Items/$itemId?api_key=$apiKey');
+      final response = await http.get(url, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return MediaItem.fromJson(data);
+      } else {
+        debugPrint('获取项目详情失败：${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('获取项目详情异常：$e');
+      return null;
+    }
+  }
+
+  /// 搜索
+  Future<List<MediaItem>> search({
+    String? query,
+    List<String>? includeItemTypes,
+    int limit = 20,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'Query': query ?? '',
+        'Limit': limit.toString(),
+        'IncludeItemTypes': includeItemTypes?.join(',') ?? 'Movie,Series,Episode,Person',
+      };
+
+      final uri = Uri.parse('$baseUrl/Items').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = data['Items'] as List? ?? [];
+        return items.map((item) => MediaItem.fromJson(item)).toList();
+      } else {
+        debugPrint('搜索失败：${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('搜索异常：$e');
+      return [];
+    }
+  }
+
+  /// 更新播放进度
+  Future<void> updatePlayState(String itemId, {
+    Duration? position,
+    Duration? runtime,
+    bool isPaused = false,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'PositionTicks': ((position?.inMilliseconds ?? 0) * 10000).toString(),
+      };
+
+      if (isPaused) {
+        final uri = Uri.parse('$baseUrl/Sessions/Playing/Paused').replace(queryParameters: queryParams);
+        await http.post(uri, headers: {
+          'X-Emby-Authorization': _authHeader,
+          'Content-Type': 'application/json',
+        }).timeout(const Duration(seconds: 5));
+      } else {
+        final uri = Uri.parse('$baseUrl/Sessions/Playing/Progress').replace(queryParameters: queryParams);
+        await http.post(uri, headers: {
+          'X-Emby-Authorization': _authHeader,
+          'Content-Type': 'application/json',
+        }).timeout(const Duration(seconds: 5));
+      }
+    } catch (e) {
+      debugPrint('更新播放进度异常：$e');
+      // 不抛出异常，避免影响播放
+    }
+  }
+
+  /// 标记为已播放
+  Future<void> markPlayed(String itemId) async {
+    try {
+      final url = Uri.parse('$baseUrl/Users/$userId/PlayedItems/$itemId?api_key=$apiKey');
+      await http.post(url, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('标记已播放异常：$e');
+    }
+  }
+
+  /// 标记为未播放
+  Future<void> markUnplayed(String itemId) async {
+    try {
+      final url = Uri.parse('$baseUrl/Users/$userId/PlayedItems/$itemId?api_key=$apiKey');
+      await http.delete(url, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('标记未播放异常：$e');
+    }
+  }
+
+  /// 获取剧集详情
+  Future<List<MediaItem>> getEpisodes(String seriesId) async {
+    try {
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'SeriesId': seriesId,
+        'SortBy': 'SortName',
+        'SortOrder': 'Ascending',
+        'ImageTypeLimit': '1',
+        'EnableImageTypes': 'Primary',
+      };
+
+      final uri = Uri.parse('$baseUrl/Shows/$seriesId/Episodes').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = (data['Items'] as List?) ?? [];
+        return items.map((item) => MediaItem.fromJson(item)).toList();
+      } else {
+        debugPrint('获取剧集失败：${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('获取剧集异常：$e');
+      return [];
+    }
+  }
+
+  /// 获取季列表
+  Future<List<MediaItem>> getSeasons(String seriesId) async {
+    try {
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'SortBy': 'SortName',
+        'SortOrder': 'Ascending',
+        'ImageTypeLimit': '1',
+        'EnableImageTypes': 'Primary',
+      };
+
+      final uri = Uri.parse('$baseUrl/Shows/$seriesId/Seasons').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = (data['Items'] as List?) ?? [];
+        return items.map((item) => MediaItem.fromJson(item)).toList();
+      } else {
+        debugPrint('获取季列表失败：${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('获取季列表异常：$e');
+      return [];
+    }
+  }
+
+  /// 获取媒体源信息（用于播放）
+  Future<Map<String, dynamic>?> getPlaybackInfo(String itemId) async {
+    try {
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'StartTimeTicks': '0',
+        'UserId': userId ?? '',
+        'AutoOpenLiveStream': 'true',
+        'IsPlayback': 'true',
+        'MaxStreamingBitrate': '100000000',
+      };
+
+      final uri = Uri.parse('$baseUrl/Items/$itemId/PlaybackInfo').replace(queryParameters: queryParams);
+      final response = await http.post(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+        'Content-Type': 'application/json',
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        debugPrint('获取播放信息失败：${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('获取播放信息异常：$e');
+      return null;
+    }
+  }
+
+  /// 获取直播流信息
+  Future<Map<String, dynamic>?> getLiveStreamMediaSource(String playSessionId) async {
+    try {
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'PlaySessionId': playSessionId,
+      };
+
+      final uri = Uri.parse('$baseUrl/LiveStreams/Open').replace(queryParameters: queryParams);
+      final response = await http.post(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+        'Content-Type': 'application/json',
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        debugPrint('获取直播流失败：${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('获取直播流异常：$e');
+      return null;
+    }
+  }
+
+  /// 停止播放
+  Future<void> stopPlayback(String itemId, {Duration? position}) async {
+    try {
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'PositionTicks': ((position?.inMilliseconds ?? 0) * 10000).toString(),
+      };
+
+      final uri = Uri.parse('$baseUrl/Sessions/Playing/Stopped').replace(queryParameters: queryParams);
+      await http.post(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+        'Content-Type': 'application/json',
+      }).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('停止播放异常：$e');
+    }
+  }
+
+  /// 测试连接
+  Future<bool> testConnection() async {
+    try {
+      final url = Uri.parse('$baseUrl/System/Info?api_key=$apiKey');
+      final response = await http.get(url, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 5));
       return response.statusCode == 200;
     } catch (e) {
+      debugPrint('连接测试异常：$e');
       return false;
     }
   }
 
-  Future<Map<String, dynamic>> getPublicInfo(String url) async {
+  /// 获取用户信息
+  Future<Map<String, dynamic>?> getUserInfo() async {
     try {
-      final response = await _dio.get('$url/System/Info/Public');
-      return response.data;
-    } catch (e) {
-      throw Exception('无法获取服务器信息：$e');
-    }
-  }
+      final url = Uri.parse('$baseUrl/Users/$userId?api_key=$apiKey');
+      final response = await http.get(url, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
 
-  Future<User> authenticate(String url, String username, String password) async {
-    try {
-      final response = await _dio.post(
-        '$url/Users/AuthenticateByName',
-        data: jsonEncode({
-          'Username': username,
-          'Pw': password,
-        }),
-        options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Emby-Authorization': _buildAuthHeader(),
-          },
-        ),
-      );
-
-      final data = response.data;
-      
-      _baseUrl = url;
-      _accessToken = data['AccessToken'];
-      _userId = data['User']['Id'];
-      
-      _currentUser = User.fromJson(data['User']);
-
-      return _currentUser!;
-    } catch (e) {
-      if (e is DioException && e.response?.statusCode == 401) {
-        throw Exception('用户名或密码错误');
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        debugPrint('获取用户信息失败：${response.statusCode}');
+        return null;
       }
-      throw Exception('认证失败：$e');
+    } catch (e) {
+      debugPrint('获取用户信息异常：$e');
+      return null;
     }
   }
 
-  String _buildAuthHeader() {
-    return 'MediaBrowser Client="E 宝盒", Device="Windows", '
-        'DeviceId="ebox-windows-${DateTime.now().millisecondsSinceEpoch}", '
-        'Version="2.0.0"';
+  /// 搜索电影
+  Future<List<MediaItem>> searchMovies(String query, {int limit = 20}) async {
+    return search(query: query, includeItemTypes: ['Movie'], limit: limit);
   }
 
-  Future<List<MediaLibrary>> getLibraries(String userId) async {
-    if (_baseUrl == null || _accessToken == null) {
-      throw Exception('请先连接到 Emby 服务器');
-    }
+  /// 搜索剧集
+  Future<List<MediaItem>> searchSeries(String query, {int limit = 20}) async {
+    return search(query: query, includeItemTypes: ['Series'], limit: limit);
+  }
 
+  /// 获取推荐项目
+  Future<List<MediaItem>> getRecommendations({int limit = 20}) async {
     try {
-      final response = await _dio.get(
-        '$_baseUrl/Users/$userId/Items?Recursive=true&StartIndex=0&Limit=100&SortBy=SortName&SortOrder=Ascending',
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'Limit': limit.toString(),
+        'ImageTypeLimit': '1',
+        'EnableImageTypes': 'Primary,Backdrop',
+      };
 
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        final items = data['Items'] as List?;
-        if (items != null) {
-          return items
-              .map((item) => MediaLibrary(
-                    id: item['Id'] as String,
-                    name: item['Name'] as String,
-                    type: _mapLibraryType(item['CollectionType'] as String?),
-                  ))
-              .toList();
-        }
+      final uri = Uri.parse('$baseUrl/Users/$userId/Recommendations').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = (data['Items'] as List?) ?? [];
+        return items.map((item) => MediaItem.fromJson(item)).toList();
+      } else {
+        debugPrint('获取推荐失败：${response.statusCode}');
+        return [];
       }
+    } catch (e) {
+      debugPrint('获取推荐异常：$e');
       return [];
-    } catch (e) {
-      throw Exception('获取媒体库失败：$e');
     }
   }
 
-  String _mapLibraryType(String? collectionType) {
-    switch (collectionType?.toLowerCase()) {
-      case 'movies':
-        return 'movie';
-      case 'tvshows':
-        return 'tvshow';
-      case 'music':
-        return 'music';
-      case 'musicvideos':
-        return 'musicvideo';
-      default:
-        return 'unknown';
-    }
-  }
-
-  Future<List<MediaItem>> getLibraryItems({
-    required String libraryId,
-    String? parentId,
-    int startIndex = 0,
-    int limit = 100,
-    String mediaType = 'Movie',
-  }) async {
-    if (_baseUrl == null || _accessToken == null) {
-      throw Exception('请先连接到 Emby 服务器');
-    }
-
+  /// 获取类似项目
+  Future<List<MediaItem>> getSimilarItems(String itemId, {int limit = 20}) async {
     try {
-      final response = await _dio.get(
-        '$_baseUrl/Users/$_userId/Items',
-        queryParameters: {
-          'UserId': _userId,
-          'Recursive': 'true',
-          'StartIndex': startIndex.toString(),
-          'Limit': limit.toString(),
-          'SortBy': 'SortName',
-          'SortOrder': 'Ascending',
-          if (parentId != null) 'ParentId': parentId,
-        },
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'Limit': limit.toString(),
+        'ImageTypeLimit': '1',
+        'EnableImageTypes': 'Primary',
+      };
 
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        final items = data['Items'] as List?;
-        if (items != null) {
-          return items.map((item) => MediaItem.fromJson(item)).toList();
-        }
+      final uri = Uri.parse('$baseUrl/Items/$itemId/Similar').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = (data['Items'] as List?) ?? [];
+        return items.map((item) => MediaItem.fromJson(item)).toList();
+      } else {
+        debugPrint('获取类似项目失败：${response.statusCode}');
+        return [];
       }
+    } catch (e) {
+      debugPrint('获取类似项目异常：$e');
       return [];
-    } catch (e) {
-      throw Exception('获取媒体项失败：$e');
     }
   }
 
-  Future<MediaItem> getItemDetail(String itemId) async {
-    if (_baseUrl == null || _accessToken == null) {
-      throw Exception('请先连接到 Emby 服务器');
-    }
-
-    try {
-      final response = await _dio.get(
-        '$_baseUrl/Users/$_userId/Items/$itemId',
-        queryParameters: {'userId': _userId},
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
-
-      return MediaItem.fromJson(response.data);
-    } catch (e) {
-      throw Exception('获取媒体详情失败：$e');
-    }
+  /// 获取工作室作品
+  Future<List<MediaItem>> getStudioItems(String studioId, {int limit = 20}) async {
+    return getLibraryItems(parentId: studioId, limit: limit);
   }
 
-  Future<List<MediaItem>> getSeasons(String seriesId, String seasonId) async {
-    if (_baseUrl == null || _accessToken == null) {
-      throw Exception('请先连接到 Emby 服务器');
-    }
+  /// 获取艺术家作品
+  Future<List<MediaItem>> getArtistItems(String artistId, {int limit = 20}) async {
+    return getLibraryItems(parentId: artistId, limit: limit);
+  }
 
+  /// 获取类型项目
+  Future<List<MediaItem>> getGenreItems(String genre, {int limit = 20}) async {
     try {
-      final response = await _dio.get(
-        '$_baseUrl/Shows/$seriesId/Episodes',
-        queryParameters: {
-          'userId': _userId,
-          'seasonId': seasonId,
-          'fields': 'Overview,PrimaryImageAspectRatio',
-        },
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
+      final queryParams = <String, String>{
+        'api_key': apiKey ?? '',
+        'Genre': genre,
+        'Limit': limit.toString(),
+        'Recursive': 'true',
+        'ImageTypeLimit': '1',
+        'EnableImageTypes': 'Primary',
+      };
 
-      final data = response.data;
-      if (data is Map<String, dynamic> && data['Items'] != null) {
-        return (data['Items'] as List).map((item) => MediaItem.fromJson(item)).toList();
+      final uri = Uri.parse('$baseUrl/Items').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: {
+        'X-Emby-Authorization': _authHeader,
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = (data['Items'] as List?) ?? [];
+        return items.map((item) => MediaItem.fromJson(item)).toList();
+      } else {
+        debugPrint('获取类型项目失败：${response.statusCode}');
+        return [];
       }
-      return [];
     } catch (e) {
-      throw Exception('获取剧集列表失败：$e');
-    }
-  }
-
-  Future<MediaItem> getEpisodeDetail(String seriesId, String seasonId, String episodeId) async {
-    return await getItemDetail(episodeId);
-  }
-
-  Future<String> getPlaybackUrl(String itemId, {bool isDirectPlay = false}) async {
-    if (_baseUrl == null || _accessToken == null) {
-      throw Exception('请先连接到 Emby 服务器');
-    }
-
-    final response = await _dio.get(
-      '$_baseUrl/Items/$itemId',
-      queryParameters: {
-        'userId': _userId,
-        'fields': 'MediaSources',
-      },
-      options: Options(
-        headers: {
-          'X-MediaBrowser-Token': _accessToken!,
-          'Accept': 'application/json',
-        },
-      ),
-    );
-
-    final mediaSources = (response.data['MediaSources'] as List?)?.first;
-    if (mediaSources == null || mediaSources['DirectStreamUrl'] == null) {
-      throw Exception('无法获取播放地址');
-    }
-
-    final url = mediaSources['DirectStreamUrl'] ?? mediaSources['StaticStreamUrl'];
-    
-    if (!url.startsWith('http')) {
-      return '$_baseUrl$url?api_key=$_accessToken';
-    }
-    
-    return url;
-  }
-
-  Future<void> reportPlaybackStart(String itemId) async {
-    if (_baseUrl == null || _accessToken == null) return;
-    try {
-      await _dio.post(
-        '$_baseUrl/Sessions/Playing',
-        data: {
-          'ItemId': itemId,
-          'ServerId': _baseUrl,
-          'MediaSourceId': itemId,
-          'PositionTicks': 0,
-        },
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
-    } catch (e) {}
-  }
-
-  Future<void> reportPlaybackProgress(String itemId, Duration position) async {
-    if (_baseUrl == null || _accessToken == null) return;
-    try {
-      await _dio.post(
-        '$_baseUrl/Sessions/Playing/Progress',
-        data: {
-          'ItemId': itemId,
-          'ServerId': _baseUrl,
-          'MediaSourceId': itemId,
-          'PositionTicks': position.inMilliseconds * 10000,
-        },
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
-    } catch (e) {}
-  }
-
-  Future<void> reportPlaybackStopped(String itemId, Duration position) async {
-    if (_baseUrl == null || _accessToken == null) return;
-    try {
-      await _dio.post(
-        '$_baseUrl/Sessions/Playing/Stopped',
-        data: {
-          'ItemId': itemId,
-          'ServerId': _baseUrl,
-          'MediaSourceId': itemId,
-          'PositionTicks': position.inMilliseconds * 10000,
-        },
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
-    } catch (e) {}
-  }
-
-  Future<void> markPlayed(String itemId) async {
-    if (_baseUrl == null || _accessToken == null) return;
-    try {
-      await _dio.post('$_baseUrl/Users/$_userId/PlayedItems/$itemId');
-    } catch (e) {}
-  }
-
-  Future<void> markUnplayed(String itemId) async {
-    if (_baseUrl == null || _accessToken == null) return;
-    try {
-      await _dio.delete('$_baseUrl/Users/$_userId/PlayedItems/$itemId');
-    } catch (e) {}
-  }
-
-  Future<List<MediaItem>> search(String query, {List<String>? types}) async {
-    if (_baseUrl == null || _accessToken == null) {
-      throw Exception('请先连接到 Emby 服务器');
-    }
-
-    try {
-      final response = await _dio.get(
-        '$_baseUrl/Users/$_userId/Items',
-        queryParameters: {
-          'searchTerm': query,
-          'Recursive': 'true',
-          'Limit': '50',
-          if (types != null) 'IncludeItemTypes': types.join(','),
-        },
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
-
-      final data = response.data;
-      if (data is Map<String, dynamic> && data['Items'] != null) {
-        return (data['Items'] as List).map((item) => MediaItem.fromJson(item)).toList();
-      }
+      debugPrint('获取类型项目异常：$e');
       return [];
-    } catch (e) {
-      throw Exception('搜索失败：$e');
-    }
-  }
-
-  Future<List<MediaItem>> getRecentlyAdded({String? parentId, int limit = 20}) async {
-    if (_baseUrl == null || _accessToken == null) {
-      throw Exception('请先连接到 Emby 服务器');
-    }
-
-    try {
-      final response = await _dio.get(
-        '$_baseUrl/Users/$_userId/Items/Latest',
-        queryParameters: {
-          'Limit': limit.toString(),
-          if (parentId != null) 'ParentId': parentId,
-        },
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
-
-      final data = response.data;
-      if (data is List) {
-        return data.map((item) => MediaItem.fromJson(item)).toList();
-      }
-      return [];
-    } catch (e) {
-      throw Exception('获取最近添加失败：$e');
-    }
-  }
-
-  Future<List<MediaItem>> getResumeItems({String? parentId, int limit = 20}) async {
-    if (_baseUrl == null || _accessToken == null) {
-      throw Exception('请先连接到 Emby 服务器');
-    }
-
-    try {
-      final response = await _dio.get(
-        '$_baseUrl/Users/$_userId/Items/Resume',
-        queryParameters: {
-          'Limit': limit.toString(),
-          if (parentId != null) 'ParentId': parentId,
-        },
-        options: Options(
-          headers: {
-            'X-MediaBrowser-Token': _accessToken!,
-            'Accept': 'application/json',
-          },
-        ),
-      );
-
-      final data = response.data;
-      if (data is Map<String, dynamic> && data['Items'] != null) {
-        return (data['Items'] as List).map((item) => MediaItem.fromJson(item)).toList();
-      }
-      return [];
-    } catch (e) {
-      throw Exception('获取续播项目失败：$e');
     }
   }
 }
