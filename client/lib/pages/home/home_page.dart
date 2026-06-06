@@ -210,8 +210,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHomeContent() {
-    return Consumer2<MediaProvider, ServerProvider>(
-      builder: (context, mediaProvider, serverProvider) {
+    return Consumer<ServerProvider>(
+      builder: (context, serverProvider) {
         final isConnected = serverProvider.activeServer != null;
         
         if (!isConnected) {
@@ -243,7 +243,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 40),
               
               // 推荐内容
-              _buildSectionTitle('为你推荐', Stars, Icons.star_outline),
+              _buildSectionTitle('为你推荐', Icons.star_outline),
               const SizedBox(height: 16),
               _buildRecommendedGrid(),
             ],
