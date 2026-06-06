@@ -1,7 +1,7 @@
-name: ebox_client
-description: E 宝盒 - 跨平台媒体中心客户端 (支持 Emby/本地媒体)
+name: ebox
+description: Hills 风格 Emby 客户端 - 支持 Windows/Android Mobile/Android TV
 publish_to: 'none'
-version: 2.0.0-beta
+version: 5.0.0+50000
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -9,63 +9,41 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
-  # 状态管理
+  cupertino_icons: ^1.0.6
   provider: ^6.1.1
-  
-  # HTTP 请求
-  dio: ^5.4.0
-  
-  # 视频播放
-  video_player: ^2.8.2
-  chewie: ^1.7.4
-  fijkplayer: ^0.10.0
-  
-  # 音频播放
-  just_audio: ^0.9.36
-  audio_session: ^0.1.18
-  
-  # 电子书阅读
-  epub_view: ^3.2.0
-  
-  # 漫画阅读
-  photo_view: ^0.14.0
-  
-  # 本地存储
+  go_router: ^13.0.0
+  http: ^1.1.0
+  video_player: ^2.8.1
+  chewie: ^1.7.1
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  path_provider: ^2.1.2
-  
-  # 文件系统
-  file_picker: ^6.1.1
-  
-  # 路由
-  go_router: ^13.0.0
-  
-  # UI 组件
-  cached_network_image: ^3.3.1
-  flutter_cache_manager: ^3.3.1
-  flutter_slidable: ^3.0.1
-  
-  # 窗口适配 (桌面端)
-  flutter_acrylic: ^1.1.2
-  
-  # 屏幕适配
-  flutter_screenutil: ^5.9.0
-  
-  # 时间格式化
-  intl: ^0.18.0
+  path_provider: ^2.1.1
+  intl: ^0.18.1
+  cached_network_image: ^3.3.0
+  connectivity_plus: ^5.0.2
+  screen_brightness: ^0.2.2+1
+  volume_controller: ^2.0.18
+  wakelock: ^0.6.2
+  audio_video_progress_bar: ^2.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
   hive_generator: ^2.0.1
-  build_runner: ^2.4.8
+  build_runner: ^2.4.7
 
 flutter:
   uses-material-design: true
-
   assets:
-    - assets/images/.gitkeep
-    - assets/fonts/.gitkeep
+    - assets/images/
+    - assets/icons/
+  
+  fonts:
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/Montserrat-Regular.ttf
+        - asset: assets/fonts/Montserrat-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Montserrat-SemiBold.ttf
+          weight: 600
