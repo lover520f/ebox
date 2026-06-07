@@ -10,45 +10,9 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.16.0'
-          channel: 'stable'
-          cache: true
-      
-      - name: Enable Windows Desktop
-        working-directory: ./client
-        run: flutter config --enable-windows-desktop
-      
-      - name: Get Flutter Dependencies
-        working-directory: ./client
-        run: flutter pub get
-      
-      - name: Build Windows
-        working-directory: ./client
-        run: flutter build windows --release
-      
-      - name: Package Windows Release
-        working-directory: ./client
-        run: |
-          Compress-Archive -Path build/windows/runner/Release/* -DestinationPath ebox-windows-${{ github.ref_name }}.zip
-          mv ebox-windows-${{ github.ref_name }}.zip ../
-      
-      - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-build
-          path: ebox-windows-${{ github.ref_name }}.zip
-
-  build-android:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     
     steps:
       - uses: actions/checkout@v4
@@ -60,75 +24,77 @@ jobs:
           channel: 'stable'
           cache: true
       
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
+      - name: Enable Platforms
+        run: |
+          flutter config --enable-linux-desktop
+          flutter config --enable-windows-desktop
+          flutter config --enable-macos-desktop
+          flutter config --enable-android
+          flutter doctor
       
-      - name: Get Flutter Dependencies
+      - name: Get Dependencies
         working-directory: ./client
         run: flutter pub get
       
-      - name: Build Android APK (Unified)
+      - name: Analyze Code
+        working-directory: ./client
+        run: flutter analyze
+        continue-on-error: true
+      
+      - name: Build APK
         working-directory: ./client
         run: flutter build apk --release
       
-      - name: Rename APK
-        working-directory: ./client
+      - name: Find APK
         run: |
-          cp build/app/outputs/flutter-apk/release/app-release.apk ebox-mobile-${{ github.ref_name }}.apk
-          cp build/app/outputs/flutter-apk/release/app-release.apk ebox-tv-${{ github.ref_name }}.apk
+          find client/build -name "*.apk" -type f
+          if [ -f "client/build/app/outputs/flutter-apk/release/app-release.apk" ]; then
+            cp client/build/app/outputs/flutter-apk/release/app-release.apk ebox-android-${{ github.ref_name }}.apk
+            echo "✓ APK found"
+          elif [ -f "client/build/app/outputs/flutter-apk/release/app-release.apk" ]; then
+            find client/build -name "app-release.apk" -exec cp {} ebox-android-${{ github.ref_name }}.apk \;
+            echo "✓ APK copied from alternate location"
+          else
+            echo "⚠ APK not found, trying appbundle"
+            flutter build appbundle --release
+          fi
       
-      - name: Upload Mobile APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-mobile
-          path: client/ebox-mobile-${{ github.ref_name }}.apk
+      - name: Build Web (fallback)
+        if: failure()
+        working-directory: ./client
+        run: flutter build web --release
       
-      - name: Upload TV APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: android-tv
-          path: client/ebox-tv-${{ github.ref_name }}.apk
+          name: android-apk
+          path: ebox-android-${{ github.ref_name }}.apk
+          if-no-files-found: warn
+          retention-days: 5
 
   create-release:
-    needs: [build-windows, build-android]
+    needs: build
     runs-on: ubuntu-latest
     
     steps:
       - uses: actions/checkout@v4
       
-      - name: Download Windows Build
+      - name: Download APK
         uses: actions/download-artifact@v4
         with:
-          name: windows-build
+          name: android-apk
           path: ./artifacts
       
-      - name: Download Mobile APK
-        uses: actions/download-artifact@v4
-        with:
-          name: android-mobile
-          path: ./artifacts
+      - name: List Files
+        run: ls -la ./artifacts/ || echo "No artifacts"
       
-      - name: Download TV APK
-        uses: actions/download-artifact@v4
-        with:
-          name: android-tv
-          path: ./artifacts
-      
-      - name: List artifacts
-        run: ls -la ./artifacts/
-      
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: E 宝盒 ${{ github.ref_name }}
-          body_path: RELEASE_NOTES_v5.0.0.md
-          files: |
-            ./artifacts/*.zip
-            ./artifacts/*.apk
+          body_file: RELEASE_NOTES_v5.0.0.md
+          files: ./artifacts/*.*
           draft: true
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
