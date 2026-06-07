@@ -1,308 +1,282 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
-
-import '../../config/theme.dart';
-import '../../providers/media_provider.dart';
+import '../../services/emby_api_service.dart';
 import '../../providers/server_provider.dart';
-import '../../models/media_item.dart';
-import '../../widgets/media_card.dart';
-import '../../widgets/loading_widget.dart';
-import '../../widgets/error_widget.dart' as custom_widgets;
 
 class LibraryPage extends StatefulWidget {
-  final String libraryId;
-
-  const LibraryPage({super.key, required this.libraryId});
+  const LibraryPage({Key? key}) : super(key: key);
 
   @override
   State<LibraryPage> createState() => _LibraryPageState();
 }
 
 class _LibraryPageState extends State<LibraryPage> {
-  int _gridColumns = 4;
-  String _sortBy = 'SortName';
-  String _viewMode = 'grid'; // grid or list
-
-  @override
-  void initState() {
-    super.initState();
-    _loadItems();
-  }
-
-  void _loadItems() {
-    context.read<MediaProvider>().loadItems(widget.libraryId);
-  }
+  bool _isLoading = false;
+  List<Map<String, dynamic>> _mediaItems = [];
+  String _error = '';
 
   @override
   Widget build(BuildContext context) {
-    final mediaProvider = context.watch<MediaProvider>();
-    final items = mediaProvider.itemsByLibrary[widget.libraryId] ?? [];
-    final isLoading = mediaProvider.isLoading;
-    final error = mediaProvider.error;
-
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            context.pop();
-          },
-        ),
         title: const Text('媒体库'),
-        actions: [
-          // 搜索
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              // TODO: 搜索功能
-            },
-            tooltip: '搜索',
-          ),
-          // 视图切换
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'grid') {
-                setState(() => _viewMode = 'grid');
-              } else if (value == 'list') {
-                setState(() => _viewMode = 'list');
-              } else if (value.startsWith('column')) {
-                setState(() {
-                  _gridColumns = int.parse(value.substring(6));
-                });
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'grid',
-                child: ListTile(
-                  leading: Icon(Icons.grid_view),
-                  title: Text('网格视图'),
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'list',
-                child: ListTile(
-                  leading: Icon(Icons.view_list),
-                  title: Text('列表视图'),
-                ),
-              ),
-              const PopupMenuDivider(),
-              _buildColumnMenuItem(2),
-              _buildColumnMenuItem(3),
-              _buildColumnMenuItem(4),
-              _buildColumnMenuItem(5),
-              _buildColumnMenuItem(6),
-            ],
-          ),
-          // 排序
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              setState(() => _sortBy = value);
-              _loadItems();
-            },
-            itemBuilder: (context) => [
-              _buildSortMenuItem('SortName', '名称'),
-              _buildSortMenuItem('ProductionYear', '年份'),
-              _buildSortMenuItem('CommunityRating', '评分'),
-              _buildSortMenuItem('DateCreated', '添加时间'),
-            ],
-          ),
-        ],
+        backgroundColor: const Color(0xFF6C5CE7),
+        foregroundColor: Colors.white,
       ),
-      body: isLoading
-          ? _buildLoadingState()
-          : error != null
-              ? _buildErrorState(error)
-              : items.isEmpty
-                  ? _buildEmptyState()
-                  : _buildContent(items),
+      body: _buildBody(),
     );
   }
 
-  Widget _buildLoadingState() {
-    if (_viewMode == 'list') {
-      return ListView.builder(
-        itemCount: 10,
-        itemBuilder: (context, index) => const ListItemLoadingWidget(),
-      );
-    } else {
-      return GridView.builder(
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: _gridColumns,
-          childAspectRatio: 2 / 3,
-          crossAxisSpacing: AppTheme.spacingM,
-          mainAxisSpacing: AppTheme.spacingM,
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C5CE7)),
         ),
-        itemCount: _gridColumns * 3,
-        itemBuilder: (context, index) => const PosterLoadingWidget(),
       );
     }
-  }
 
-  Widget _buildErrorState(String error) {
-    return custom_widgets.ErrorWidget(
-      message: '加载失败',
-      hint: error,
-      icon: Icons.cloud_off_outlined,
-      onRetry: _loadItems,
-    );
-  }
-
-  Widget _buildContent(List<MediaItem> items) {
-    if (_viewMode == 'list') {
-      return ListView.builder(
-        padding: const EdgeInsets.all(AppTheme.spacingM),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return _buildListItem(item);
-        },
-      );
-    } else {
-      return GridView.builder(
-        padding: const EdgeInsets.all(AppTheme.spacingM),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: _gridColumns,
-          childAspectRatio: 2 / 3,
-          crossAxisSpacing: AppTheme.spacingM,
-          mainAxisSpacing: AppTheme.spacingM,
-        ),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return MediaCard(item: item);
-        },
-      );
-    }
-  }
-
-  Widget _buildListItem(MediaItem item) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppTheme.spacingM),
-      child: InkWell(
-        onTap: () {
-          context.goNamed('detail', pathParameters: {'mediaId': item.id});
-        },
-        borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.spacingM),
-          child: Row(
-            children: [
-              // 封面图
-              Container(
-                width: 80,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: AppTheme.cardColor,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                ),
-                child: Icon(Icons.movie, size: 40, color: AppTheme.textSecondary),
-              ),
-              const SizedBox(width: AppTheme.spacingM),
-              // 信息
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: AppTheme.spacingXS),
-                    Row(
-                      children: [
-                        if (item.productionYear != null) ...[
-                          Text(
-                            '${item.productionYear}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(width: AppTheme.spacingS),
-                        ],
-                        if (item.communityRating != null) ...[
-                          const Icon(Icons.star, size: 16, color: AppTheme.warningColor),
-                          const SizedBox(width: AppTheme.spacingXS),
-                          Text(
-                            '${item.communityRating}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (item.overview != null) ...[
-                      const SizedBox(height: AppTheme.spacingS),
-                      Text(
-                        item.overview!,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textSecondary,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.movie_outlined,
-            size: 80,
-            color: AppTheme.textSecondary,
-          ),
-          const SizedBox(height: AppTheme.spacingL),
-          const Text(
-            '暂无媒体内容',
-            style: TextStyle(
-              fontSize: 20,
-              color: AppTheme.textPrimary,
+    if (_error.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+            const SizedBox(height: 16),
+            Text(
+              _error,
+              style: const TextStyle(color: Colors.white70),
+              textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('重试'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C5CE7),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_mediaItems.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6C5CE7), Color(0xFF00CEC9)],
+                ),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: const Icon(Icons.folder_open, size: 50, color: Colors.white),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              '暂无媒体内容',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '请在 Emby 服务器中添加媒体',
+              style: TextStyle(color: Colors.grey[400]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      color: const Color(0xFF6C5CE7),
+      child: GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.65,
+        ),
+        itemCount: _mediaItems.length,
+        itemBuilder: (context, index) {
+          final item = _mediaItems[index];
+          return _buildMediaCard(item);
+        },
+      ),
+    );
+  }
+
+  Widget _buildMediaCard(Map<String, dynamic> item) {
+    final name = item['Name'] as String? ?? '未知';
+    final year = item['ProductionYear'];
+    final hasImage = item['ImageTags']?['Primary'] != null;
+
+    return GestureDetector(
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('点击了：$name'),
+            backgroundColor: const Color(0xFF6C5CE7),
           ),
-        ],
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF141414),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: hasImage
+                  ? Image.network(
+                      _getImageUrl(item['Id'], item['ImageTags']['Primary']),
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          color: const Color(0xFF141414),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              value: progress.expectedTotalDuration != null
+                                  ? progress.cumulativeBytesLoaded /
+                                      progress.expectedTotalBytes!
+                                  : null,
+                              strokeWidth: 2,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color(0xFF6C5CE7),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return _buildPlaceholder();
+                      },
+                    )
+                  : _buildPlaceholder(),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (year != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      year.toString(),
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  PopupMenuItem<String> _buildColumnMenuItem(int columns) {
-    return PopupMenuItem(
-      value: 'column$columns',
-      child: ListTile(
-        leading: Icon(Icons.view_module),
-        title: Text('$columns 列'),
+  Widget _buildPlaceholder() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: const Color(0xFF141414),
+      child: const Center(
+        child: Icon(
+          Icons.movie,
+          size: 40,
+          color: Colors.grey,
+        ),
       ),
     );
   }
 
-  PopupMenuItem<String> _buildSortMenuItem(String value, String label) {
-    return PopupMenuItem(
-      value: value,
-      child: ListTile(
-        leading: Icon(_sortBy == value ? Icons.check : Icons.sort),
-        title: Text(label),
-      ),
-    );
+  String _getImageUrl(String itemId, String tag) {
+    final server = context.read<ServerProvider>().activeServer;
+    if (server == null) return '';
+    return '${server.url}/Items/$itemId/Images/Primary?tag=$tag&api_key=${server.apiKey}';
+  }
+
+  Future<void> _loadData() async {
+    final serverProvider = context.read<ServerProvider>();
+    final server = serverProvider.activeServer;
+
+    if (server == null) {
+      setState(() => _error = '请先添加服务器');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
+
+    try {
+      final api = EmbyApiService(
+        baseUrl: server.url,
+        apiKey: server.apiKey,
+        userId: '1',
+      );
+
+      final views = await api.getUserViews();
+      print('媒体库数量：${views.length}');
+
+      if (views.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _mediaItems = [];
+        });
+        return;
+      }
+
+      final items = await api.getLibraryItems(
+        parentId: views.first['Id'],
+        limit: 50,
+      );
+
+      setState(() {
+        _mediaItems = items;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = '加载失败：$e';
+        _isLoading = false;
+      });
+    }
   }
 }
