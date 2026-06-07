@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/server_provider.dart';
 import '../library/library_page.dart';
 
@@ -14,47 +15,15 @@ class HomePage extends StatelessWidget {
         title: const Text('E 宝盒'),
         backgroundColor: const Color(0xFF6C5CE7),
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => _loadData(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => _showSettings(context),
-          ),
-        ],
       ),
       body: Consumer<ServerProvider>(
         builder: (context, serverProvider, child) {
           final server = serverProvider.activeServer;
-          
           if (server == null) {
             return _buildWelcome(context);
           }
-          
           return _buildHome(context, server);
         },
-      ),
-    );
-  }
-
-  void _loadData(BuildContext context) {
-    final server = context.read<ServerProvider>().activeServer;
-    if (server != null) {
-      scaffoldMsg(context, '正在刷新...');
-    }
-  }
-
-  void _showSettings(BuildContext context) {
-    scaffoldMsg(context, '设置功能开发中');
-  }
-
-  void scaffoldMsg(BuildContext context, String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: const Color(0xFF6C5CE7),
       ),
     );
   }
@@ -91,7 +60,7 @@ class HomePage extends StatelessWidget {
           ),
           const SizedBox(height: 48),
           ElevatedButton.icon(
-            onPressed: () => _gotoServers(context),
+            onPressed: () => context.go('/servers'),
             icon: const Icon(Icons.add, size: 24),
             label: const Text('添加服务器', style: TextStyle(fontSize: 18)),
             style: ElevatedButton.styleFrom(
@@ -106,11 +75,7 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  void _gotoServers(BuildContext context) {
-    Navigator.of(context).pushNamed('/servers');
-  }
-
-  Widget _buildHome(BuildContext context, dynamic server) {
+  Widget _buildHome(BuildContext context, ServerInfo server) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -118,13 +83,13 @@ class HomePage extends StatelessWidget {
         children: [
           _buildServerCard(server),
           const SizedBox(height: 24),
-          _buildFeatureGrid(context),
+          _buildFeatureGrid(context, server),
         ],
       ),
     );
   }
 
-  Widget _buildServerCard(dynamic server) {
+  Widget _buildServerCard(ServerInfo server) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -162,14 +127,14 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildFeatureGrid(BuildContext context) {
+  Widget _buildFeatureGrid(BuildContext context, ServerInfo server) {
     final features = [
-      {'icon': Icons.movie, 'title': '电影', 'page': 'library'},
-      {'icon': Icons.tv, 'title': '剧集', 'page': 'library'},
-      {'icon': Icons.play_circle, 'title': '继续观看', 'page': 'library'},
-      {'icon': Icons.folder, 'title': '本地媒体', 'page': null},
-      {'icon': Icons.search, 'title': '搜索', 'page': null},
-      {'icon': Icons.settings, 'title': '设置', 'page': null},
+      {'icon': Icons.movie, 'title': '电影', 'enabled': true},
+      {'icon': Icons.tv, 'title': '剧集', 'enabled': true},
+      {'icon': Icons.play_circle, 'title': '继续观看', 'enabled': true},
+      {'icon': Icons.folder, 'title': '本地媒体', 'enabled': false},
+      {'icon': Icons.search, 'title': '搜索', 'enabled': false},
+      {'icon': Icons.settings, 'title': '设置', 'enabled': false},
     ];
 
     return GridView.builder(
@@ -190,16 +155,19 @@ class HomePage extends StatelessWidget {
   }
 
   Widget _buildFeatureCard(BuildContext context, Map<String, dynamic> feature) {
-    final hasPage = feature['page'] != null;
-    
+    final enabled = feature['enabled'] as bool;
+
     return GestureDetector(
       onTap: () {
-        if (hasPage) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const LibraryPage()),
-          );
+        if (feature['title'] == '电影' || feature['title'] == '剧集' || feature['title'] == '继续观看') {
+          context.push('/library');
         } else {
-          scaffoldMsg(context, '${feature['title']} 功能开发中');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${feature['title']} 功能开发中'),
+              backgroundColor: const Color(0xFF6C5CE7),
+            ),
+          );
         }
       },
       child: Container(
@@ -214,14 +182,14 @@ class HomePage extends StatelessWidget {
             Icon(
               feature['icon'] as IconData,
               size: 40,
-              color: hasPage ? const Color(0xFF6C5CE7) : Colors.grey[600],
+              color: enabled ? const Color(0xFF6C5CE7) : Colors.grey[600],
             ),
             const SizedBox(height: 12),
             Text(
               feature['title'] as String,
               style: TextStyle(
                 fontSize: 16,
-                color: hasPage ? Colors.white : Colors.grey[600],
+                color: enabled ? Colors.white : Colors.grey[600],
                 fontWeight: FontWeight.w600,
               ),
             ),

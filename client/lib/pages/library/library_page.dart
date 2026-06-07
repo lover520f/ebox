@@ -24,13 +24,26 @@ class _LibraryPageState extends State<LibraryPage> {
         title: const Text('媒体库'),
         backgroundColor: const Color(0xFF6C5CE7),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadData,
+            tooltip: '刷新',
+          ),
+        ],
       ),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
+    final server = context.read<ServerProvider>().activeServer;
+    
+    if (server == null) {
+      return _buildNoServer();
+    }
+
+    if (_isLoading && _mediaItems.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(
           valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C5CE7)),
@@ -39,66 +52,118 @@ class _LibraryPageState extends State<LibraryPage> {
     }
 
     if (_error.isNotEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-            const SizedBox(height: 16),
-            Text(
-              _error,
-              style: const TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _loadData,
-              icon: const Icon(Icons.refresh),
-              label: const Text('重试'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C5CE7),
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildError();
     }
 
     if (_mediaItems.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6C5CE7), Color(0xFF00CEC9)],
-                ),
-                borderRadius: BorderRadius.circular(50),
-              ),
-              child: const Icon(Icons.folder_open, size: 50, color: Colors.white),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              '暂无媒体内容',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '请在 Emby 服务器中添加媒体',
-              style: TextStyle(color: Colors.grey[400]),
-            ),
-          ],
-        ),
-      );
+      return _buildEmpty();
     }
 
+    return _buildGrid();
+  }
+
+  Widget _buildNoServer() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6C5CE7), Color(0xFF00CEC9)],
+              ),
+              borderRadius: BorderRadius.circular(50),
+            ),
+            child: const Icon(Icons.cloud_off, size: 50, color: Colors.white),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            '请先添加服务器',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+          const SizedBox(height: 16),
+          Text(
+            _error,
+            style: const TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _loadData,
+            icon: const Icon(Icons.refresh),
+            label: const Text('重试'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C5CE7),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmpty() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6C5CE7), Color(0xFF00CEC9)],
+              ),
+              borderRadius: BorderRadius.circular(50),
+            ),
+            child: const Icon(Icons.folder_open, size: 50, color: Colors.white),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            '暂无媒体内容',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '请在 Emby 服务器中添加媒体',
+            style: TextStyle(color: Colors.grey[400]),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _loadData,
+            icon: const Icon(Icons.refresh),
+            label: const Text('刷新'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C5CE7),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGrid() {
     return RefreshIndicator(
       onRefresh: _loadData,
       color: const Color(0xFF6C5CE7),
@@ -121,9 +186,10 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Widget _buildMediaCard(Map<String, dynamic> item) {
     final name = item['Name'] as String? ?? '未知';
-    final id = item['Id'] as String? ?? '';
+    final id = item['Id'] as String;
     final year = item['ProductionYear'];
-    final hasImage = item['ImageTags']?['Primary'] != null;
+    final imageTags = item['ImageTags'] as Map<String, dynamic>?;
+    final hasImage = imageTags?['Primary'] != null;
 
     return GestureDetector(
       onTap: () {
@@ -142,7 +208,7 @@ class _LibraryPageState extends State<LibraryPage> {
             Expanded(
               child: hasImage
                   ? Image.network(
-                      _getImageUrl(id, item['ImageTags']['Primary']),
+                      _getImageUrl(id, imageTags!['Primary'] as String),
                       width: double.infinity,
                       height: double.infinity,
                       fit: BoxFit.cover,
@@ -216,10 +282,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Future<void> _loadData() async {
     final server = context.read<ServerProvider>().activeServer;
-    if (server == null) {
-      setState(() => _error = '请先添加服务器');
-      return;
-    }
+    if (server == null) return;
 
     setState(() {
       _isLoading = true;

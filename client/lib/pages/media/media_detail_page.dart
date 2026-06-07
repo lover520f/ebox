@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../services/emby_api_service.dart';
 import '../../providers/server_provider.dart';
-import 'package:provider/provider.dart';
 
 class MediaDetailPage extends StatefulWidget {
   final Map<String, dynamic> item;
@@ -25,18 +25,17 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
   }
 
   Future<void> _loadDetails() async {
+    final server = context.read<ServerProvider>().activeServer;
+    if (server == null) {
+      setState(() {
+        _error = '未连接服务器';
+      });
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      final server = context.read<ServerProvider>().activeServer;
-      if (server == null) {
-        setState(() {
-          _error = '未连接服务器';
-          _isLoading = false;
-        });
-        return;
-      }
-
       final api = EmbyApiService(
         baseUrl: server.url,
         apiKey: server.apiKey,
@@ -46,16 +45,16 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
       final itemId = widget.item['Id'] as String;
       final details = await api.getItem(itemId);
 
-      setState(() {
-        _details = details;
-        _isLoading = false;
-      });
+      if (details != null) {
+        setState(() => _details = details);
+      }
     } catch (e) {
       setState(() {
         _error = '加载失败：$e';
-        _isLoading = false;
       });
     }
+
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -65,7 +64,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     final overview = data['Overview'] as String?;
     final year = data['ProductionYear'];
     final rating = data['CommunityRating'];
-    final runtime = data['RunTimeTicks'];
+    final runtime = data['RunTimeTicks'] as int?;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
@@ -111,7 +110,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
   }
 
   Widget _buildAppBar(Map<String, dynamic> data, String name) {
-    final backdropUrl = _getBackdropUrl(data['Id']);
+    final backdropUrl = _getBackdropUrl(data['Id'] as String);
 
     return SliverAppBar(
       expandedHeight: 300,
@@ -138,13 +137,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                 fit: BoxFit.cover,
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;
-                  return Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF6C5CE7), Color(0xFF00CEC9)],
-                      ),
-                    ),
-                  );
+                  return _buildGradientBackground();
                 },
                 errorBuilder: (context, error, stackTrace) {
                   return _buildGradientBackground();
@@ -195,13 +188,12 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     );
   }
 
-  Widget _buildMetadata(dynamic year, dynamic rating, dynamic runtime) {
+  Widget _buildMetadata(dynamic year, dynamic rating, int? runtime) {
     return Wrap(
       spacing: 12,
       runSpacing: 8,
       children: [
-        if (year != null)
-          _buildChip(year.toString()),
+        if (year != null) _buildChip(year.toString()),
         if (rating != null)
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -214,8 +206,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
               ),
             ],
           ),
-        if (runtime != null)
-          _buildChip(_formatRuntime(runtime)),
+        if (runtime != null) _buildChip(_formatRuntime(runtime)),
       ],
     );
   }
@@ -276,20 +267,10 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     final itemId = data['Id'] as String;
     final name = data['Name'] as String? ?? '视频';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('准备播放：$name'),
-        backgroundColor: const Color(0xFF6C5CE7),
-      ),
-    );
-
-    Navigator.of(context).pushNamed(
-      '/player',
-      arguments: {
-        'itemId': itemId,
-        'title': name,
-      },
-    );
+    context.go('/player', extra: {
+      'itemId': itemId,
+      'title': name,
+    });
   }
 
   String _getBackdropUrl(String itemId) {

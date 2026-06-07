@@ -31,7 +31,8 @@ jobs:
         working-directory: ./client
         run: flutter build apk --release
         
-      - uses: softprops/action-gh-release@v2
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
         with:
           name: E 宝盒 ${{ github.ref_name }}
           body: |
@@ -40,6 +41,7 @@ jobs:
             - Emby 客户端
             - 服务器管理
             - 媒体浏览
+            - 视频播放
           files: ./client/build/app/outputs/flutter-apk/release/app-release.apk
           draft: true
         env:

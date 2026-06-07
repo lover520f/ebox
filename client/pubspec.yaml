@@ -1,7 +1,7 @@
 name: ebox
 description: Hills 风格 Emby 客户端
 publish_to: 'none'
-version: 5.0.5+50005
+version: 5.0.8+50008
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -14,6 +14,9 @@ dependencies:
   go_router: ^13.0.0
   http: ^1.1.0
   video_player: ^2.8.1
+  path_provider: ^2.1.1
+  cached_network_image: ^3.3.0
+  audio_video_progress_bar: ^2.0.2
 
 dev_dependencies:
   flutter_test:
@@ -22,7 +25,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  path_provider: ^2.1.1
-  cached_network_image: ^3.3.0
-  audio_video_progress_bar: ^2.0.2
-  volume_controller: ^2.0.18

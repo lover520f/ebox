@@ -29,17 +29,17 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/media/:id',
       builder: (context, state) {
-        final item = state.extra as Map<String, dynamic>? ?? {};
+        final item = state.extra as Map<String, dynamic>;
         return MediaDetailPage(item: item);
       },
     ),
     GoRoute(
       path: '/player',
       builder: (context, state) {
-        final args = state.extra as Map<String, dynamic>? ?? {};
+        final args = state.extra as Map<String, dynamic>;
         return VideoPlayerPage(
-          itemId: args['itemId'] as String? ?? '',
-          title: args['title'] as String? ?? '视频播放',
+          itemId: args['itemId'] as String,
+          title: args['title'] as String,
         );
       },
     ),
