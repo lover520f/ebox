@@ -24,3 +24,5 @@ flutter:
   uses-material-design: true
   path_provider: ^2.1.1
   cached_network_image: ^3.3.0
+  audio_video_progress_bar: ^2.0.2
+  volume_controller: ^2.0.18

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/emby_api_service.dart';
 import '../../providers/server_provider.dart';
 
@@ -47,7 +48,6 @@ class _LibraryPageState extends State<LibraryPage> {
             Text(
               _error,
               style: const TextStyle(color: Colors.white70),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -121,25 +121,19 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Widget _buildMediaCard(Map<String, dynamic> item) {
     final name = item['Name'] as String? ?? '未知';
+    final id = item['Id'] as String? ?? '';
     final year = item['ProductionYear'];
     final hasImage = item['ImageTags']?['Primary'] != null;
 
     return GestureDetector(
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('点击了：$name'),
-            backgroundColor: const Color(0xFF6C5CE7),
-          ),
-        );
+        context.go('/media/$id', extra: item);
       },
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFF141414),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.1),
-          ),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -148,7 +142,7 @@ class _LibraryPageState extends State<LibraryPage> {
             Expanded(
               child: hasImage
                   ? Image.network(
-                      _getImageUrl(item['Id'], item['ImageTags']['Primary']),
+                      _getImageUrl(id, item['ImageTags']['Primary']),
                       width: double.infinity,
                       height: double.infinity,
                       fit: BoxFit.cover,
@@ -158,10 +152,6 @@ class _LibraryPageState extends State<LibraryPage> {
                           color: const Color(0xFF141414),
                           child: Center(
                             child: CircularProgressIndicator(
-                              value: progress.expectedTotalDuration != null
-                                  ? progress.cumulativeBytesLoaded /
-                                      progress.expectedTotalBytes!
-                                  : null,
                               strokeWidth: 2,
                               valueColor: const AlwaysStoppedAnimation<Color>(
                                 Color(0xFF6C5CE7),
@@ -195,10 +185,7 @@ class _LibraryPageState extends State<LibraryPage> {
                     const SizedBox(height: 4),
                     Text(
                       year.toString(),
-                      style: TextStyle(
-                        color: Colors.grey[500],
-                        fontSize: 11,
-                      ),
+                      style: TextStyle(color: Colors.grey[500], fontSize: 11),
                     ),
                   ],
                 ],
@@ -216,11 +203,7 @@ class _LibraryPageState extends State<LibraryPage> {
       height: double.infinity,
       color: const Color(0xFF141414),
       child: const Center(
-        child: Icon(
-          Icons.movie,
-          size: 40,
-          color: Colors.grey,
-        ),
+        child: Icon(Icons.movie, size: 40, color: Colors.grey),
       ),
     );
   }
@@ -232,9 +215,7 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Future<void> _loadData() async {
-    final serverProvider = context.read<ServerProvider>();
-    final server = serverProvider.activeServer;
-
+    final server = context.read<ServerProvider>().activeServer;
     if (server == null) {
       setState(() => _error = '请先添加服务器');
       return;
@@ -253,8 +234,6 @@ class _LibraryPageState extends State<LibraryPage> {
       );
 
       final views = await api.getUserViews();
-      print('媒体库数量：${views.length}');
-
       if (views.isEmpty) {
         setState(() {
           _isLoading = false;

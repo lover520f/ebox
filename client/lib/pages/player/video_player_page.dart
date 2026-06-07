@@ -1,186 +1,201 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
-
-import '../../config/theme.dart';
-import '../../services/video_player_service.dart';
+import 'package:provider/provider.dart';
+import '../../services/emby_api_service.dart';
 import '../../providers/server_provider.dart';
 
 class VideoPlayerPage extends StatefulWidget {
   final String itemId;
-  final String serverId;
-  final String? videoUrl;
+  final String title;
 
   const VideoPlayerPage({
-    super.key,
+    Key? key,
     required this.itemId,
-    required this.serverId,
-    this.videoUrl,
-  });
+    required this.title,
+  }) : super(key: key);
 
   @override
   State<VideoPlayerPage> createState() => _VideoPlayerPageState();
 }
 
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
-  late VideoPlayerService _playerService;
-  bool _showControls = true;
-  bool _isBuffering = true;
-  String? _errorMessage;
-  
-  DateTime _lastInteractionTime = DateTime.now();
-  Timer? _controlsTimer;
+  VideoPlayerController? _controller;
+  bool _isPlaying = false;
+  bool _isLoading = true;
+  String? _error;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
-    _playerService = VideoPlayerService();
-    _initializePlayer();
+    _initPlayer();
+    _setupKeyboard();
   }
 
-  void _initializePlayer() async {
+  Future<void> _initPlayer() async {
     try {
-      setState(() => _isBuffering = true);
-      
-      final serverProvider = context.read<ServerProvider>();
-      final apiClient = serverProvider.apiClient;
-      
-      String videoUrl = widget.videoUrl ?? '';
-      
-      // 如果没有传入 videoUrl，从 Emby 获取
-      if (videoUrl.isEmpty) {
-        videoUrl = await apiClient.getPlaybackUrl(widget.itemId);
+      final server = context.read<ServerProvider>().activeServer;
+      if (server == null) {
+        setState(() {
+          _error = '未连接服务器';
+          _isLoading = false;
+        });
+        return;
       }
+
+      final api = EmbyApiService(
+        baseUrl: server.url,
+        apiKey: server.apiKey,
+        userId: '1',
+      );
+
+      final playbackInfo = await api.getPlaybackInfo(widget.itemId);
       
-      // 初始化播放器
-      await _playerService.initialize(videoUrl);
+      if (playbackInfo == null) {
+        setState(() {
+          _error = '无法获取播放信息';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final mediaSources = playbackInfo['MediaSources'] as List?;
+      if (mediaSources == null || mediaSources.isEmpty) {
+        setState(() {
+          _error = '无可用媒体源';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final mediaSource = mediaSources.first;
+      String? videoUrl = mediaSource['DirectStreamUrl'] as String?;
       
-      setState(() {
-        _isBuffering = false;
+      if (videoUrl == null || videoUrl.isEmpty) {
+        final container = mediaSource['Container'] as String?;
+        if (container != null) {
+          videoUrl = '${server.url}/Videos/${widget.itemId}/stream.$container?api_key=${server.apiKey}';
+        }
+      }
+
+      if (videoUrl == null || !videoUrl.startsWith('http')) {
+        videoUrl = '${server.url}/Videos/${widget.itemId}/stream?api_key=${server.apiKey}';
+      }
+
+      print('播放地址：$videoUrl');
+
+      _controller = VideoPlayerController.networkUrl(
+        Uri.parse(videoUrl),
+      )..initialize().then((_) {
+        setState(() {
+          _isLoading = false;
+          _duration = _controller!.duration;
+        });
+        _controller!.play();
+        setState(() => _isPlaying = true);
+      }).catchError((e) {
+        setState(() {
+          _error = '播放失败：$e';
+          _isLoading = false;
+        });
       });
-      
-      // 自动开始播放
-      _playerService.play();
-      
     } catch (e) {
       setState(() {
-        _isBuffering = false;
-        _errorMessage = '视频加载失败：$e';
+        _error = '初始化失败：$e';
+        _isLoading = false;
       });
     }
   }
 
-  @override
-  void dispose() {
-    _controlsTimer?.cancel();
-    _playerService.dispose();
-    super.dispose();
-  }
+  void _setupKeyboard() {
+    RawKeyboard.instance.addListener((event) {
+      if (event is! KeyDownEvent) return;
 
-  void _showControlsTemporarily() {
-    setState(() => _showControls = true);
-    _lastInteractionTime = DateTime.now();
-    
-    _controlsTimer?.cancel();
-    _controlsTimer = Timer(const Duration(seconds: 3), () {
-      if (_playerService.isPlaying && mounted) {
-        setState(() => _showControls = false);
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        _exitPlayer();
+      } else if (event.logicalKey == LogicalKeyboardKey.space) {
+        _togglePlay();
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+        _seekRelative(-10);
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+        _seekRelative(10);
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        _changeVolume(0.1);
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        _changeVolume(-0.1);
       }
     });
   }
 
+  void _exitPlayer() {
+    _controller?.pause();
+    Navigator.of(context).pop();
+  }
+
+  void _togglePlay() {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+
+    if (_isPlaying) {
+      _controller!.pause();
+    } else {
+      _controller!.play();
+    }
+    setState(() => _isPlaying = !_isPlaying);
+  }
+
+  void _seekRelative(int seconds) {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+
+    final newPos = _position + Duration(seconds: seconds);
+    if (newPos < Duration.zero) {
+      _controller!.seekTo(Duration.zero);
+    } else if (newPos > _duration) {
+      _controller!.seekTo(_duration);
+    } else {
+      _controller!.seekTo(newPos);
+    }
+  }
+
+  void _changeVolume(double delta) {
+    // TODO: 实现音量控制
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    RawKeyboard.instance.removeHandler((event) {});
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return _buildLoadingScreen();
+    }
+
+    if (_error != null) {
+      return _buildErrorScreen();
+    }
+
+    return _buildPlayerScreen();
+  }
+
+  Widget _buildLoadingScreen() {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // 视频区域
-          Positioned.fill(
-            child: Center(
-              child: _playerService.isInitialized
-                  ? AspectRatio(
-                      aspectRatio: _playerService.controller!.value.aspectRatio,
-                      child: VideoPlayer(_playerService.controller!),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-          ),
-          // 返回按钮（始终显示在顶层）
-          Positioned(
-            top: MediaQuery.of(context).padding.top,
-            left: 16,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 32),
-              onPressed: () {
-                context.pop();
-              },
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.black54,
-                padding: const EdgeInsets.all(12),
-              ),
-            ),
-          ),
-          // 错误提示
-          if (_errorMessage != null)
-            Positioned(
-              top: 100,
-              left: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget buildVideoArea() {
-    return GestureDetector(
-      onTap: _showControlsTemporarily,
-      onDoubleTap: () {
-        final screenState = _playerService.isPlaying ? _playerService.position.inSeconds : 0;
-        if (screenState < 5) {
-          _playerService.rewind(const Duration(seconds: 10));
-        } else {
-          _playerService.forward(const Duration(seconds: 10));
-        }
-      },
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: _playerService.controller?.value.aspectRatio ?? 16 / 9,
-          child: VideoPlayer(_playerService.controller!),
-        ),
-      ),
-    );
-  }
-
-  Widget buildBufferingIndicator() {
-    return Container(
-      color: Colors.black.withOpacity(0.7),
-      child: const Center(
+      body: Center(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 16),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C5CE7)),
+            ),
+            const SizedBox(height: 24),
             Text(
-              '正在加载...',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-              ),
+              '正在加载 ${widget.title}...',
+              style: const TextStyle(color: Colors.white, fontSize: 16),
             ),
           ],
         ),
@@ -188,39 +203,28 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     );
   }
 
-  Widget buildErrorWidget() {
-    return Container(
-      color: Colors.black,
-      child: Center(
+  Widget _buildErrorScreen() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red,
-            ),
-            const SizedBox(height: 16),
+            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+            const SizedBox(height: 24),
             Text(
-              _errorMessage!,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-              ),
+              _error!,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: () {
-                _initializePlayer();
-              },
-              child: const Text('重试'),
-            ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () {
-                context.pop();
-              },
+              onPressed: _exitPlayer,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C5CE7),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              ),
               child: const Text('返回'),
             ),
           ],
@@ -229,296 +233,73 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     );
   }
 
-  Widget buildTopBar() {
-    return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + AppTheme.spacingM,
-        left: AppTheme.spacingM,
-        right: AppTheme.spacingM,
-      ),
-      child: Row(
+  Widget _buildPlayerScreen() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        alignment: Alignment.center,
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () {
-              context.pop();
-            },
+          AspectRatio(
+            aspectRatio: _controller!.value.aspectRatio,
+            child: VideoPlayer(_controller!),
           ),
-          const SizedBox(width: AppTheme.spacingM),
-          Expanded(
+          VideoProgressIndicator(
+            _controller!,
+            allowScrubbing: true,
+            colors: VideoProgressColors(
+              playedColor: const Color(0xFF6C5CE7),
+              bufferedColor: Colors.white30,
+              backgroundColor: Colors.white20,
+            ),
+            padding: const EdgeInsets.all(20),
+          ),
+          Positioned(
+            top: 40,
+            left: 20,
+            child: IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.arrow_back, color: Colors.white),
+              ),
+              onPressed: _exitPlayer,
+            ),
+          ),
+          Positioned(
+            top: 40,
+            right: 20,
             child: Text(
-              '视频播放',
+              widget.title,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(width: AppTheme.spacingM),
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () {
-              _showSettingsMenu();
-            },
-          ),
-        ],
-      ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withOpacity(0.8),
-            Colors.transparent,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget buildBottomBar() {
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: AppTheme.spacingM,
-        left: AppTheme.spacingM,
-        right: AppTheme.spacingM,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 进度条
-          buildProgressBar(),
-          const SizedBox(height: AppTheme.spacingM),
-          // 控制按钮
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // 快退 10 秒
-              IconButton(
-                icon: const Icon(Icons.replay_10, color: Colors.white, size: 32),
-                onPressed: () {
-                  _playerService.rewind(const Duration(seconds: 10));
-                },
-                iconSize: 32,
-              ),
-              // 播放/暂停
-              IconButton(
-                icon: Icon(
-                  _playerService.isPlaying ? Icons.pause_circle : Icons.play_circle,
+          if (!_isPlaying)
+            GestureDetector(
+              onTap: _togglePlay,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6C5CE7).withOpacity(0.8),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.play_arrow,
                   color: Colors.white,
-                  size: 48,
-                ),
-                onPressed: () {
-                  _playerService.togglePlayPause();
-                  _showControlsTemporarily();
-                },
-                iconSize: 48,
-              ),
-              // 快进 10 秒
-              IconButton(
-                icon: const Icon(Icons.forward_10, color: Colors.white, size: 32),
-                onPressed: () {
-                  _playerService.forward(const Duration(seconds: 10));
-                },
-                iconSize: 32,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTheme.spacingM),
-          // 附加控制
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // 音量控制
-              Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _playerService.isMuted ? Icons.volume_off : Icons.volume_up,
-                      color: Colors.white,
-                    ),
-                    onPressed: () {
-                      _playerService.toggleMute();
-                    },
-                  ),
-                  SizedBox(
-                    width: 80,
-                    child: Slider(
-                      value: _playerService.volume,
-                      onChanged: (value) {
-                        _playerService.setVolume(value);
-                      },
-                      activeColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-              // 播放速度
-              TextButton(
-                onPressed: _showSpeedMenu,
-                child: Text(
-                  '${_playerService.speed}x',
-                  style: const TextStyle(color: Colors.white),
+                  size: 50,
                 ),
               ),
-              // 字幕
-              IconButton(
-                icon: const Icon(Icons.subtitles, color: Colors.white),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('字幕功能请稍后使用...')),
-                  );
-                },
-              ),
-            ],
-          ),
+            ),
         ],
-      ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            Colors.black.withOpacity(0.8),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget buildProgressBar() {
-    return Row(
-      children: [
-        Text(
-          _formatDuration(_playerService.position),
-          style: const TextStyle(color: Colors.white, fontSize: 12),
-        ),
-        const SizedBox(width: AppTheme.spacingS),
-        Expanded(
-          child: SliderTheme(
-            data: SliderThemeData(
-              activeTrackColor: AppTheme.primaryColor,
-              inactiveTrackColor: Colors.white30,
-              thumbColor: Colors.white,
-              trackHeight: 4,
-            ),
-            child: Slider(
-              value: _playerService.position.inSeconds.toDouble(),
-              max: _playerService.duration.inSeconds.toDouble() > 0 
-                  ? _playerService.duration.inSeconds.toDouble() 
-                  : 1,
-              onChanged: (value) {
-                _playerService.seekTo(Duration(seconds: value.toInt()));
-                setState(() {});
-              },
-            ),
-          ),
-        ),
-        const SizedBox(width: AppTheme.spacingS),
-        Text(
-          _formatDuration(_playerService.duration),
-          style: const TextStyle(color: Colors.white, fontSize: 12),
-        ),
-      ],
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    
-    if (hours > 0) {
-      return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-    } else {
-      return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-    }
-  }
-
-  void _showSettingsMenu() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(AppTheme.spacingL),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.hd),
-              title: const Text('画质'),
-              subtitle: const Text('原始'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('画质选择功能开发中...')),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.subtitles),
-              title: const Text('字幕'),
-              subtitle: const Text('自动'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('字幕功能开发中...')),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.speed),
-              title: const Text('播放速度'),
-              subtitle: Text('${_playerService.speed}x'),
-              onTap: () {
-                Navigator.pop(context);
-                _showSpeedMenu();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showSpeedMenu() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(AppTheme.spacingM),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '播放速度',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacingM),
-            ...const [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((speed) {
-              return ListTile(
-                leading: Icon(
-                  _playerService.speed == speed 
-                      ? Icons.check 
-                      : Icons.speed,
-                  color: _playerService.speed == speed 
-                      ? AppTheme.primaryColor 
-                      : null,
-                ),
-                title: Text('${speed}x'),
-                onTap: () {
-                  _playerService.setSpeed(speed);
-                  Navigator.pop(context);
-                },
-              );
-            }).toList(),
-          ],
-        ),
       ),
     );
   }
