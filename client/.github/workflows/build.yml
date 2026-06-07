@@ -11,6 +11,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     
     steps:
       - uses: actions/checkout@v4
@@ -21,12 +22,24 @@ jobs:
           channel: 'stable'
       
       - run: flutter config --enable-android
-      - run: cd client && flutter pub get
-      - run: cd client && flutter build apk --release
       
+      - name: Get Dependencies
+        working-directory: ./client
+        run: flutter pub get
+        
+      - name: Build APK
+        working-directory: ./client
+        run: flutter build apk --release
+        
       - uses: softprops/action-gh-release@v2
         with:
           name: E 宝盒 ${{ github.ref_name }}
+          body: |
+            ## ✨ 功能特性
+            - Hills 风格 UI
+            - Emby 客户端
+            - 服务器管理
+            - 媒体浏览
           files: ./client/build/app/outputs/flutter-apk/release/app-release.apk
           draft: true
         env:
