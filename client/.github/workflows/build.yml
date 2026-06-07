@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -16,8 +19,13 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: '3.16.0'
           channel: 'stable'
+          cache: true
+      
+      - name: Enable Windows Desktop
+        working-directory: ./client
+        run: flutter config --enable-windows-desktop
       
       - name: Get Flutter Dependencies
         working-directory: ./client
@@ -31,12 +39,13 @@ jobs:
         working-directory: ./client
         run: |
           Compress-Archive -Path build/windows/runner/Release/* -DestinationPath ebox-windows-${{ github.ref_name }}.zip
+          mv ebox-windows-${{ github.ref_name }}.zip ../
       
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: client/ebox-windows-${{ github.ref_name }}.zip
+          path: ebox-windows-${{ github.ref_name }}.zip
 
   build-android:
     runs-on: ubuntu-latest
@@ -47,8 +56,9 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: '3.16.0'
           channel: 'stable'
+          cache: true
       
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -60,19 +70,15 @@ jobs:
         working-directory: ./client
         run: flutter pub get
       
-      - name: Build Android Mobile APK
+      - name: Build Android APK (Unified)
         working-directory: ./client
-        run: flutter build apk --release -t lib/main/main_mobile.dart --flavor mobile
+        run: flutter build apk --release
       
-      - name: Build Android TV APK
-        working-directory: ./client
-        run: flutter build apk --release -t lib/main/main_tv.dart --flavor tv
-      
-      - name: Rename APKs
+      - name: Rename APK
         working-directory: ./client
         run: |
-          mv build/app/outputs/flutter-apk/app-mobile-release.apk ebox-mobile-${{ github.ref_name }}.apk
-          mv build/app/outputs/flutter-apk/app-tv-release.apk ebox-tv-${{ github.ref_name }}.apk
+          cp build/app/outputs/flutter-apk/release/app-release.apk ebox-mobile-${{ github.ref_name }}.apk
+          cp build/app/outputs/flutter-apk/release/app-release.apk ebox-tv-${{ github.ref_name }}.apk
       
       - name: Upload Mobile APK
         uses: actions/upload-artifact@v4
@@ -111,8 +117,11 @@ jobs:
           name: android-tv
           path: ./artifacts
       
+      - name: List artifacts
+        run: ls -la ./artifacts/
+      
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: E 宝盒 ${{ github.ref_name }}
           body_path: RELEASE_NOTES_v5.0.0.md
