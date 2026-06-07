@@ -12,22 +12,15 @@ permissions:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.16.0'
           channel: 'stable'
-          cache: true
-      
-      - name: Enable Android
-        run: flutter config --enable-android
       
       - name: Get Dependencies
         working-directory: ./client
@@ -36,33 +29,14 @@ jobs:
       - name: Build APK
         working-directory: ./client
         run: flutter build apk --release
-        
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-apk
-          path: client/build/app/outputs/flutter-apk/release/app-release.apk
+        timeout-minutes: 30
       
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: E 宝盒 ${{ github.ref_name }}
-          body: |
-            ## 📦 E 宝盒 ${{ github.ref_name }}
-            
-            ### ✨ 功能特性
-            - Hills 风格 UI
-            - Emby 客户端
-            - 视频播放
-            - 媒体库浏览
-            
-            ### 📱 平台支持
-            - Android Mobile
-            - Android TV
-          files: |
-            ./client/build/app/outputs/flutter-apk/release/app-release.apk
+          body: 自动构建的 APK
+          files: ./client/build/app/outputs/flutter-apk/release/app-release.apk
           draft: true
-          fail_on_unmatched_files: false
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
