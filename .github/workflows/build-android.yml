@@ -1,10 +1,13 @@
 name: Build Android APK
 
 on:
+  push:
+    tags:
+      - 'v*-android'
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (例如 v5.0.8)'
+        description: '版本号'
         required: true
         default: 'v5.0.8'
 
@@ -35,7 +38,9 @@ jobs:
           flutter pub get
           echo "flutter.sdk=$FLUTTER_HOME" > android/local.properties
           echo "flutter.buildMode=release" >> android/local.properties
-          echo "flutter.versionName=${{ github.event.inputs.version }}" >> android/local.properties
+          TAG=${{ github.ref_name }}
+          if [ -z "$TAG" ]; then TAG=${{ github.event.inputs.version }}; fi
+          echo "flutter.versionName=$TAG" >> android/local.properties
           echo "flutter.versionCode=50008" >> android/local.properties
           cat android/local.properties
       
@@ -45,10 +50,9 @@ jobs:
       
       - name: Upload
         uses: softprops/action-gh-release@v3
-        if: always()
         with:
-          name: E 宝盒 ${{ github.event.inputs.version }}
-          tag_name: ${{ github.event.inputs.version }}
+          name: E 宝盒 ${{ github.ref_name || github.event.inputs.version }}
+          tag_name: ${{ github.ref_name || github.event.inputs.version }}
           body: |
             ## Android APK
             

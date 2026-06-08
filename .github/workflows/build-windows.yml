@@ -1,10 +1,13 @@
 name: Build Windows EXE
 
 on:
+  push:
+    tags:
+      - 'v*-win'
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (例如 v5.0.8)'
+        description: '版本号'
         required: true
         default: 'v5.0.8'
 
@@ -25,8 +28,7 @@ jobs:
           channel: 'stable'
       
       - name: Setup
-        run: |
-          flutter config --enable-windows-desktop
+        run: flutter config --enable-windows-desktop
         shell: bash
       
       - name: Build
@@ -37,22 +39,20 @@ jobs:
         shell: pwsh
         working-directory: ./client/build/windows/runner/Release
         run: |
-          $zip = "..\..\..\..\ebox-windows.zip"
+          $zip = "ebox-windows.zip"
           Compress-Archive -Path * -DestinationPath $zip -Force
           Write-Host "Created: $zip"
-          Get-Item $zip | Select-Object Name,Length
       
       - name: Upload
         uses: softprops/action-gh-release@v3
-        if: always()
         with:
-          name: E 宝盒 ${{ github.event.inputs.version }}
-          tag_name: ${{ github.event.inputs.version }}-windows
+          name: E 宝盒 ${{ github.ref_name || github.event.inputs.version }}
+          tag_name: ${{ github.ref_name || github.event.inputs.version }}
           body: |
             ## Windows 便携版
             
-            解压后运行 ebox_client.exe
-          files: ./client/build/windows/runner/Release/../../../../ebox-windows.zip
+            解压运行 ebox_client.exe
+          files: ./client/build/windows/runner/Release/ebox-windows.zip
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
