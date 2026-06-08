@@ -1,0 +1,58 @@
+name: Build Android
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.0'
+          channel: 'stable'
+      
+      - name: Get Dependencies
+        working-directory: ./client
+        run: flutter pub get
+      
+      - name: Build APK
+        working-directory: ./client
+        run: flutter build apk --release
+      
+      - name: Upload Release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: E 宝盒 ${{ github.ref_name }}
+          body: |
+            ## 📦 Android 版本
+            
+            ### 安装说明
+            1. 下载 app-release.apk
+            2. 在 Android 设备上安装
+            3. 添加 Emby 服务器地址
+            
+            ## ✨ 功能
+            - Hills 风格 UI
+            - 服务器管理
+            - 媒体库浏览
+            - 视频播放
+          files: ./client/build/app/outputs/flutter-apk/release/app-release.apk
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
