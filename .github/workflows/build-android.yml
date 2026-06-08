@@ -32,20 +32,24 @@ jobs:
           flutter-version: '3.16.0'
           channel: 'stable'
       
-      - name: Build APK
+      - name: Build Release
         working-directory: ./client
         run: |
           flutter pub get
-          flutter build apk --release --verbose
+          flutter build apk --release
       
-      - name: Upload Release
+      - name: Release
         uses: softprops/action-gh-release@v3
         with:
           name: E 宝盒 ${{ github.ref_name || github.event.inputs.version }}
           tag_name: ${{ github.ref_name || github.event.inputs.version }}
           body: |
             ## Android APK
-          files: ./client/build/app/outputs/flutter-apk/release/*.apk
+            
+            下载后安装
+          files: |
+            ./client/build/app/outputs/flutter-apk/release/*.apk
+            ./client/build/app/outputs/flutter-apk/release/*.apk.sha1
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
