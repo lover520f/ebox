@@ -17,7 +17,7 @@ permissions:
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     
     steps:
       - uses: actions/checkout@v4
@@ -36,17 +36,36 @@ jobs:
         working-directory: ./client
         run: |
           flutter pub get
+          mkdir -p android
           echo "flutter.sdk=$FLUTTER_HOME" > android/local.properties
           echo "flutter.buildMode=release" >> android/local.properties
           TAG=${{ github.ref_name }}
-          if [ -z "$TAG" ]; then TAG=${{ github.event.inputs.version }}; fi
+          [ -z "$TAG" ] && TAG=${{ github.event.inputs.version }}
           echo "flutter.versionName=$TAG" >> android/local.properties
           echo "flutter.versionCode=50008" >> android/local.properties
           cat android/local.properties
       
       - name: Build
         working-directory: ./client
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release 2>&1 || {
+            echo "Build failed, checking output..."
+            find . -name "*.apk" -type f
+            exit 1
+          }
+      
+      - name: Find APK
+        id: apk
+        run: |
+          APK=$(find ./client/build -name "app-release.apk" -type f 2>/dev/null | head -1)
+          if [ -n "$APK" ] && [ -f "$APK" ]; then
+            echo "path=$APK" >> $GITHUB_OUTPUT
+            ls -lh "$APK"
+          else
+            echo "APK not found, searching..."
+            find ./client/build -name "*.apk" -type f 2>/dev/null || true
+            exit 1
+          fi
       
       - name: Upload
         uses: softprops/action-gh-release@v3
@@ -55,9 +74,8 @@ jobs:
           tag_name: ${{ github.ref_name || github.event.inputs.version }}
           body: |
             ## Android APK
-            
             下载后直接安装
-          files: ./client/build/app/outputs/flutter-apk/release/app-release.apk
+          files: ${{ steps.apk.outputs.path }}
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
