@@ -1,15 +1,16 @@
-name: Build APK
+name: Build APK & Windows
 
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  build-android:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     
@@ -29,7 +30,73 @@ jobs:
         
       - name: Build APK
         working-directory: ./client
-        run: flutter build apk --release
+        run: flutter build apk --release --verbose
+        
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: ./client/build/app/outputs/flutter-apk/release/app-release.apk
+          retention-days: 7
+
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: subosito/flutter-action@v3
+        with:
+          flutter-version: '3.16.0'
+          channel: 'stable'
+      
+      - name: Enable Windows
+        run: flutter config --enable-windows-desktop
+        
+      - name: Get Dependencies
+        working-directory: ./client
+        run: flutter pub get
+        
+      - name: Build Windows
+        working-directory: ./client
+        run: flutter build windows --release --verbose
+        
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "client\build\windows\runner\Release\*" `
+            -DestinationPath "dist\ebox-windows.zip" -Force
+          
+      - name: Upload Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-windows
+          path: dist/ebox-windows.zip
+          retention-days: 7
+
+  release:
+    needs: [build-android, build-windows]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-apk
+          path: ./artifacts/apk
+          
+      - name: Download Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-windows
+          path: ./artifacts/windows
+          
+      - name: List Files
+        run: ls -la ./artifacts/apk ./artifacts/windows
         
       - name: Create Release
         uses: softprops/action-gh-release@v3
@@ -42,7 +109,13 @@ jobs:
             - 服务器管理
             - 媒体浏览
             - 视频播放
-          files: ./client/build/app/outputs/flutter-apk/release/app-release.apk
+            
+            ## 📦 下载
+            - Android: app-release.apk
+            - Windows: ebox-windows.zip
+          files: |
+            ./artifacts/apk/app-release.apk
+            ./artifacts/windows/ebox-windows.zip
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
