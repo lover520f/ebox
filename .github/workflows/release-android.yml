@@ -1,23 +1,19 @@
-name: Build Android
+name: Release Android
 
 on:
-  push:
-    tags:
-      - 'v*-android'
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (e.g. v5.0.8)'
+        description: '版本号 (例如 v5.0.8)'
         required: true
-        default: 'v5.0.8-android'
+        default: 'v5.0.8'
 
 permissions:
   contents: write
 
 jobs:
-  build-android:
+  release-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
     
     steps:
       - uses: actions/checkout@v4
@@ -31,57 +27,48 @@ jobs:
         with:
           flutter-version: '3.16.0'
           channel: 'stable'
-          cache: true
       
       - name: Get Dependencies
         working-directory: ./client
-        run: |
-          flutter pub get
-          flutter pub deps
-        
+        run: flutter pub get
+      
       - name: Create local.properties
         working-directory: ./client/android
         run: |
           echo "flutter.sdk=$FLUTTER_HOME" > local.properties
-          echo "flutter.versionName=${{ github.event.inputs.version || github.ref_name }}" >> local.properties
+          echo "flutter.versionName=${{ github.event.inputs.version }}" >> local.properties
           echo "flutter.versionCode=50008" >> local.properties
           echo "flutter.buildMode=release" >> local.properties
           cat local.properties
       
       - name: Build APK
         working-directory: ./client
-        run: |
-          flutter build apk --release --verbose 2>&1 | tee build.log
-          echo "Build exit code: $?"
-          
+        run: flutter build apk --release
+      
       - name: Find APK
         id: apk
         run: |
-          APK=$(find ./client/build -name "*.apk" -type f 2>/dev/null | head -1)
-          if [ -n "$APK" ]; then
-            echo "path=$APK" >> $GITHUB_OUTPUT
-            ls -lh "$APK"
-          else
-            echo "APK not found!"
-            exit 1
-          fi
+          APK=$(find ./client/build -name "*.apk" | head -1)
+          echo "path=$APK" >> $GITHUB_OUTPUT
+          ls -lh "$APK"
       
-      - name: Upload Release
+      - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
-          name: E 宝盒 ${{ github.event.inputs.version || github.ref_name }}
+          name: E 宝盒 ${{ github.event.inputs.version }}
+          tag_name: ${{ github.event.inputs.version }}
           body: |
-            ## 📦 E 宝盒 Android
+            ## 📱 Android 版本
             
-            ### 安装
-            1. 下载 APK
-            2. 允许安装未知来源
-            3. 安装运行
+            ### 安装说明
+            1. 下载 app-release.apk
+            2. 在 Android 上允许安装未知来源
+            3. 安装并运行
             
-            ### 功能
-            - Hills 风格 UI
+            ## ✨ 功能
+            - Hills 风格渐变 UI
             - 多服务器管理
-            - 媒体库
+            - 媒体库浏览
             - 视频播放
           files: ${{ steps.apk.outputs.path }}
           draft: true
