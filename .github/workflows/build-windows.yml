@@ -1,13 +1,10 @@
-name: Build Windows
+name: Build Windows EXE
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号'
+        description: '版本号 (例如 v5.0.8)'
         required: true
         default: 'v5.0.8'
 
@@ -22,99 +19,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.16.0'
           channel: 'stable'
       
-      - name: Check Version
-        id: version
-        shell: bash
+      - name: Setup
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
+          flutter config --enable-windows-desktop
+        shell: bash
       
-      - name: Enable Windows
-        run: flutter config --enable-windows-desktop
-      
-      - name: Get Dependencies
-        working-directory: ./client
-        run: flutter pub get
-      
-      - name: Build Windows
+      - name: Build
         working-directory: ./client
         run: flutter build windows --release
       
-      - name: Find Executable
+      - name: Package
         shell: pwsh
-        id: find
+        working-directory: ./client/build/windows/runner/Release
         run: |
-          $exePath = Get-ChildItem -Path "client\build\windows\runner\Release" -Filter "*.exe" | Select-Object -First 1
-          if ($exePath) {
-            Write-Host "Found: $($exePath.FullName)"
-            echo "exe=$($exePath.FullName)" >> $env:GITHUB_OUTPUT
-          } else {
-            Write-Error "Executable not found"
-            exit 1
-          }
-        
-      - name: Create Release EXE
-        shell: pwsh
-        run: |
-          $src = ${{ steps.find.outputs.exe }}
-          $dst = "ebox_client.exe"
-          
-          # 复制主程序
-          Copy-Item $src $dst
-          
-          # 复制依赖文件
-          Get-ChildItem -Path "client\build\windows\runner\Release" -Exclude "*.exe" -File | 
-            Copy-Item -Destination "."
-          
-          Write-Host "Release files:"
-          Get-ChildItem | Select-Object Name,Length
-          
-          # 创建 ZIP
-          Compress-Archive -Path ".\*" -DestinationPath "ebox-windows.zip" -Force
-          Write-Host "ZIP: ebox-windows.zip"
-          
-        working-directory: ./client/temp
-        continue-on-error: true
+          $zip = "..\..\..\..\ebox-windows.zip"
+          Compress-Archive -Path * -DestinationPath $zip -Force
+          Write-Host "Created: $zip"
+          Get-Item $zip | Select-Object Name,Length
       
-      - name: Simple ZIP
-        shell: pwsh
-        run: |
-          cd client
-          $dir = "build\windows\runner\Release"
-          if (Test-Path $dir) {
-            Compress-Archive -Path "$dir\*" -DestinationPath "ebox-windows.zip" -Force
-            Write-Host "✓ Created ebox-windows.zip"
-            Get-Item ebox-windows.zip | Select-Object Name,Length
-          } else {
-            Write-Error "Not found: $dir"
-            exit 1
-          }
-      
-      - name: Upload Release
+      - name: Upload
         uses: softprops/action-gh-release@v3
+        if: always()
         with:
-          name: E 宝盒 ${{ steps.version.outputs.tag }}
+          name: E 宝盒 ${{ github.event.inputs.version }}
+          tag_name: ${{ github.event.inputs.version }}-windows
           body: |
-            ## 📦 Windows 便携版
+            ## Windows 便携版
             
-            ### 使用
-            1. 下载 ebox-windows.zip
-            2. 解压运行 ebox_client.exe
-            
-            ## ✨ 功能
-            - Hills 风格 UI
-            - Emby 客户端
-            - 媒体播放
-          files: ./client/ebox-windows.zip
+            解压后运行 ebox_client.exe
+          files: ./client/build/windows/runner/Release/../../../../ebox-windows.zip
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
