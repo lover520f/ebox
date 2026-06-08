@@ -32,11 +32,15 @@ jobs:
           flutter-version: '3.16.0'
           channel: 'stable'
       
-      - name: Build Release
+      - name: Build
+        id: build
         working-directory: ./client
         run: |
           flutter pub get
           flutter build apk --release
+          APK=$(find ./build -name "app-release.apk" -type f | head -1)
+          echo "apk=$APK" >> $GITHUB_OUTPUT
+          ls -lh "$APK"
       
       - name: Release
         uses: softprops/action-gh-release@v3
@@ -46,10 +50,8 @@ jobs:
           body: |
             ## Android APK
             
-            下载后安装
-          files: |
-            ./client/build/app/outputs/flutter-apk/release/*.apk
-            ./client/build/app/outputs/flutter-apk/release/*.apk.sha1
+            下载安装
+          files: ${{ steps.build.outputs.apk }}
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
