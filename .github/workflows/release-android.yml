@@ -1,0 +1,66 @@
+name: Manual Release Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如 v5.0.8)'
+        required: true
+        default: 'v5.0.8'
+      build_run_id:
+        description: '构建 Run ID (可选)'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.0'
+          channel: 'stable'
+      
+      - name: Build APK
+        id: build
+        working-directory: ./client
+        run: |
+          flutter pub get
+          flutter build apk --release
+          APK=$(find ./build -name "app-release.apk" -type f | head -1)
+          echo "apk=$APK" >> $GITHUB_OUTPUT
+          echo "APK path: $APK"
+          ls -lh "$APK"
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: E 宝盒 ${{ github.event.inputs.version }}
+          tag_name: ${{ github.event.inputs.version }}
+          body: |
+            ## 📱 E 宝盒 Android
+            
+            ### 安装
+            1. 下载 APK
+            2. 允许未知来源安装
+            3. 安装运行
+            
+            ### 功能
+            - Hills 风格 UI
+            - Emby 客户端
+            
+            ⚠️ AI 测试版本
+          files: ${{ steps.build.outputs.apk }}
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
