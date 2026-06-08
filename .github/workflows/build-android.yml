@@ -32,6 +32,9 @@ jobs:
           flutter-version: '3.16.0'
           channel: 'stable'
       
+      - name: Enable write permissions
+        run: echo "GITHUB_TOKEN=$(cat ${{ github.token }})" >> $GITHUB_ENV
+      
       - name: Build
         id: build
         working-directory: ./client
@@ -42,15 +45,13 @@ jobs:
           echo "apk=$APK" >> $GITHUB_OUTPUT
           ls -lh "$APK"
       
-      - name: Release
+      - name: Create Release Draft
         uses: softprops/action-gh-release@v3
         with:
-          name: E 宝盒 ${{ github.ref_name || github.event.inputs.version }}
           tag_name: ${{ github.ref_name || github.event.inputs.version }}
+          name: E 宝盒 ${{ github.ref_name || github.event.inputs.version }}
           body: |
             ## Android APK
-            
-            下载安装
           files: ${{ steps.build.outputs.apk }}
           draft: true
         env:
