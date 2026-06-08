@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 jobs:
-  build-android:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     
@@ -24,7 +24,7 @@ jobs:
       
       - uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '11'
           distribution: 'temurin'
       
       - uses: subosito/flutter-action@v2
@@ -32,50 +32,20 @@ jobs:
           flutter-version: '3.16.0'
           channel: 'stable'
       
-      - name: Setup
+      - name: Build APK
         working-directory: ./client
         run: |
           flutter pub get
-          mkdir -p android
-          echo "flutter.sdk=$FLUTTER_HOME" > android/local.properties
-          echo "flutter.buildMode=release" >> android/local.properties
-          TAG=${{ github.ref_name }}
-          [ -z "$TAG" ] && TAG=${{ github.event.inputs.version }}
-          echo "flutter.versionName=$TAG" >> android/local.properties
-          echo "flutter.versionCode=50008" >> android/local.properties
-          cat android/local.properties
+          flutter build apk --release --verbose
       
-      - name: Build
-        working-directory: ./client
-        run: |
-          flutter build apk --release 2>&1 || {
-            echo "Build failed, checking output..."
-            find . -name "*.apk" -type f
-            exit 1
-          }
-      
-      - name: Find APK
-        id: apk
-        run: |
-          APK=$(find ./client/build -name "app-release.apk" -type f 2>/dev/null | head -1)
-          if [ -n "$APK" ] && [ -f "$APK" ]; then
-            echo "path=$APK" >> $GITHUB_OUTPUT
-            ls -lh "$APK"
-          else
-            echo "APK not found, searching..."
-            find ./client/build -name "*.apk" -type f 2>/dev/null || true
-            exit 1
-          fi
-      
-      - name: Upload
+      - name: Upload Release
         uses: softprops/action-gh-release@v3
         with:
           name: E 宝盒 ${{ github.ref_name || github.event.inputs.version }}
           tag_name: ${{ github.ref_name || github.event.inputs.version }}
           body: |
             ## Android APK
-            下载后直接安装
-          files: ${{ steps.apk.outputs.path }}
+          files: ./client/build/app/outputs/flutter-apk/release/*.apk
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

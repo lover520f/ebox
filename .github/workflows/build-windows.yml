@@ -15,9 +15,9 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
+  build:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     
     steps:
       - uses: actions/checkout@v4
@@ -27,38 +27,21 @@ jobs:
           flutter-version: '3.16.0'
           channel: 'stable'
       
-      - name: Setup
-        run: flutter config --enable-windows-desktop
-        shell: bash
-      
-      - name: Build
+      - name: Build Windows
         working-directory: ./client
-        run: flutter build windows --release
-      
-      - name: Package
-        shell: pwsh
         run: |
-          $src = "client\build\windows\runner\Release"
-          $zip = "ebox-windows.zip"
-          Write-Host "Source: $src"
-          if (Test-Path $src) {
-            Compress-Archive -Path "$src\*" -DestinationPath $zip -Force
-            Write-Host "Created: $zip"
-            Get-Item $zip | Select-Object Name,Length
-          } else {
-            Write-Error "Not found: $src"
-            exit 1
-          }
+          flutter config --enable-windows-desktop
+          flutter pub get
+          flutter build windows --release --verbose
       
-      - name: Upload
+      - name: Upload Release
         uses: softprops/action-gh-release@v3
         with:
           name: E 宝盒 ${{ github.ref_name || github.event.inputs.version }}
           tag_name: ${{ github.ref_name || github.event.inputs.version }}
           body: |
             ## Windows 便携版
-            解压运行 ebox_client.exe
-          files: ebox-windows.zip
+          files: ./client/build/windows/runner/Release/*.exe
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
