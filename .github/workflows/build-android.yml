@@ -3,8 +3,13 @@ name: Build Android
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*-android'
   workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (e.g. v5.0.8)'
+        required: true
+        default: 'v5.0.8-android'
 
 permissions:
   contents: write
@@ -12,7 +17,7 @@ permissions:
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     
     steps:
       - uses: actions/checkout@v4
@@ -26,33 +31,59 @@ jobs:
         with:
           flutter-version: '3.16.0'
           channel: 'stable'
+          cache: true
       
       - name: Get Dependencies
         working-directory: ./client
-        run: flutter pub get
+        run: |
+          flutter pub get
+          flutter pub deps
+        
+      - name: Create local.properties
+        working-directory: ./client/android
+        run: |
+          echo "flutter.sdk=$FLUTTER_HOME" > local.properties
+          echo "flutter.versionName=${{ github.event.inputs.version || github.ref_name }}" >> local.properties
+          echo "flutter.versionCode=50008" >> local.properties
+          echo "flutter.buildMode=release" >> local.properties
+          cat local.properties
       
       - name: Build APK
         working-directory: ./client
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release --verbose 2>&1 | tee build.log
+          echo "Build exit code: $?"
+          
+      - name: Find APK
+        id: apk
+        run: |
+          APK=$(find ./client/build -name "*.apk" -type f 2>/dev/null | head -1)
+          if [ -n "$APK" ]; then
+            echo "path=$APK" >> $GITHUB_OUTPUT
+            ls -lh "$APK"
+          else
+            echo "APK not found!"
+            exit 1
+          fi
       
       - name: Upload Release
         uses: softprops/action-gh-release@v3
         with:
-          name: E 宝盒 ${{ github.ref_name }}
+          name: E 宝盒 ${{ github.event.inputs.version || github.ref_name }}
           body: |
-            ## 📦 Android 版本
+            ## 📦 E 宝盒 Android
             
-            ### 安装说明
-            1. 下载 app-release.apk
-            2. 在 Android 设备上安装
-            3. 添加 Emby 服务器地址
+            ### 安装
+            1. 下载 APK
+            2. 允许安装未知来源
+            3. 安装运行
             
-            ## ✨ 功能
+            ### 功能
             - Hills 风格 UI
-            - 服务器管理
-            - 媒体库浏览
+            - 多服务器管理
+            - 媒体库
             - 视频播放
-          files: ./client/build/app/outputs/flutter-apk/release/app-release.apk
+          files: ${{ steps.apk.outputs.path }}
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
