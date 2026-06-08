@@ -1,0 +1,52 @@
+name: Release Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如 v5.0.8)'
+        required: true
+        default: 'v5.0.8'
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.0'
+          channel: 'stable'
+      
+      - name: Build
+        working-directory: ./client
+        run: |
+          flutter config --enable-windows-desktop
+          flutter pub get
+          flutter build windows --release
+      
+      - name: Release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: E 宝盒 ${{ github.event.inputs.version }}
+          tag_name: ${{ github.event.inputs.version }}
+          body: |
+            ## Windows 便携版
+            
+            ### 使用
+            1. 下载 ebox_client.exe
+            2. 直接运行
+            
+            ## 功能
+            - Hills 风格 UI
+            - Emby 客户端
+            - 视频播放
+          files: ./client/build/windows/runner/Release/*.exe
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
