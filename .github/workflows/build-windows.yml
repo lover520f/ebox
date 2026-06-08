@@ -1,10 +1,13 @@
 name: Build Windows
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (例如 v5.0.8)'
+        description: '版本号'
         required: true
         default: 'v5.0.8'
 
@@ -19,10 +22,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.16.0'
           channel: 'stable'
+      
+      - name: Check Version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
       
       - name: Enable Windows
         run: flutter config --enable-windows-desktop
@@ -35,37 +49,71 @@ jobs:
         working-directory: ./client
         run: flutter build windows --release
       
-      - name: Create ZIP
+      - name: Find Executable
         shell: pwsh
-        working-directory: ./client
+        id: find
         run: |
-          $src = "build\windows\runner\Release"
-          $dst = "ebox-windows.zip"
+          $exePath = Get-ChildItem -Path "client\build\windows\runner\Release" -Filter "*.exe" | Select-Object -First 1
+          if ($exePath) {
+            Write-Host "Found: $($exePath.FullName)"
+            echo "exe=$($exePath.FullName)" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Error "Executable not found"
+            exit 1
+          }
+        
+      - name: Create Release EXE
+        shell: pwsh
+        run: |
+          $src = ${{ steps.find.outputs.exe }}
+          $dst = "ebox_client.exe"
           
-          Write-Host "Creating ZIP from: $src"
-          Get-ChildItem -Path $src | ForEach-Object { Write-Host "  - $($_.Name)" }
+          # 复制主程序
+          Copy-Item $src $dst
           
-          Compress-Archive -Path "$src\*" -DestinationPath $dst -Force
-          Write-Host "ZIP created: $dst"
-          Get-Item $dst | Select-Object Name,Length
+          # 复制依赖文件
+          Get-ChildItem -Path "client\build\windows\runner\Release" -Exclude "*.exe" -File | 
+            Copy-Item -Destination "."
+          
+          Write-Host "Release files:"
+          Get-ChildItem | Select-Object Name,Length
+          
+          # 创建 ZIP
+          Compress-Archive -Path ".\*" -DestinationPath "ebox-windows.zip" -Force
+          Write-Host "ZIP: ebox-windows.zip"
+          
+        working-directory: ./client/temp
+        continue-on-error: true
+      
+      - name: Simple ZIP
+        shell: pwsh
+        run: |
+          cd client
+          $dir = "build\windows\runner\Release"
+          if (Test-Path $dir) {
+            Compress-Archive -Path "$dir\*" -DestinationPath "ebox-windows.zip" -Force
+            Write-Host "✓ Created ebox-windows.zip"
+            Get-Item ebox-windows.zip | Select-Object Name,Length
+          } else {
+            Write-Error "Not found: $dir"
+            exit 1
+          }
       
       - name: Upload Release
         uses: softprops/action-gh-release@v3
         with:
-          name: E 宝盒 ${{ github.event.inputs.version }}
+          name: E 宝盒 ${{ steps.version.outputs.tag }}
           body: |
             ## 📦 Windows 便携版
             
-            ### 使用说明
+            ### 使用
             1. 下载 ebox-windows.zip
-            2. 解压到任意目录
-            3. 运行 ebox_client.exe
+            2. 解压运行 ebox_client.exe
             
             ## ✨ 功能
             - Hills 风格 UI
-            - 服务器管理
-            - 媒体库浏览
-            - 视频播放
+            - Emby 客户端
+            - 媒体播放
           files: ./client/ebox-windows.zip
           draft: true
         env:
