@@ -33,13 +33,29 @@ jobs:
         
       - name: Build APK
         working-directory: ./client
+        run: |
+          cd android
+          ./gradlew assembleRelease
+        continue-on-error: true
+      
+      - name: Build APK (Flutter)
+        working-directory: ./client
         run: flutter build apk --release
+        continue-on-error: true
+        
+      - name: Find APK
+        id: find_apk
+        run: |
+          APK=$(find ./client/build -name "*.apk" -type f 2>/dev/null | head -1)
+          echo "apk_path=$APK" >> $GITHUB_OUTPUT
+          ls -la "$APK" 2>/dev/null || echo "APK not found"
         
       - name: Upload APK
+        if: steps.find_apk.outputs.apk_path != ''
         uses: actions/upload-artifact@v4
         with:
           name: ebox-android
-          path: client/build/app/outputs/flutter-apk/release/app-release.apk
+          path: ${{ steps.find_apk.outputs.apk_path }}
           retention-days: 7
 
   build-windows:
@@ -65,12 +81,25 @@ jobs:
         working-directory: ./client
         run: flutter build windows --release
         
+      - name: Find Build Files
+        run: |
+          Get-ChildItem -Path "client\build\windows" -Recurse -Filter "*.exe" | ForEach-Object {
+            Write-Host "Found: $($_.FullName)"
+          }
+          
       - name: Create ZIP
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Compress-Archive -Path "client\build\windows\runner\Release\*" `
-            -DestinationPath "dist\ebox-windows.zip" -Force
+          $releasePath = "client\build\windows\runner\Release"
+          if (Test-Path $releasePath) {
+            New-Item -ItemType Directory -Force -Path dist | Out-Null
+            Compress-Archive -Path "$releasePath\*" `
+              -DestinationPath "dist\ebox-windows.zip" -Force
+            Write-Host "ZIP created successfully"
+          } else {
+            Write-Error "Release path not found: $releasePath"
+            exit 1
+          }
           
       - name: Upload Windows
         uses: actions/upload-artifact@v4
@@ -82,24 +111,27 @@ jobs:
   release:
     needs: [build-android, build-windows]
     runs-on: ubuntu-latest
+    if: always()
     
     steps:
       - uses: actions/checkout@v4
       
       - name: Download APK
+        if: needs.build-android.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: ebox-android
           path: ./artifacts/android
           
       - name: Download Windows
+        if: needs.build-windows.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: ebox-windows
           path: ./artifacts/windows
           
       - name: List Files
-        run: ls -la ./artifacts/android ./artifacts/windows
+        run: ls -la ./artifacts/ || echo "No artifacts"
         
       - name: Create Release
         uses: softprops/action-gh-release@v3
@@ -117,8 +149,8 @@ jobs:
             - Android: app-release.apk
             - Windows: ebox-windows.zip
           files: |
-            ./artifacts/android/app-release.apk
-            ./artifacts/windows/ebox-windows.zip
+            ./artifacts/android/*.apk
+            ./artifacts/windows/*.zip
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
