@@ -1,4 +1,4 @@
-name: Build APK & Windows
+name: Build Windows & Android
 
 on:
   push:
@@ -12,17 +12,20 @@ permissions:
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     
     steps:
       - uses: actions/checkout@v4
+      
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
       
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.16.0'
           channel: 'stable'
-      
-      - run: flutter config --enable-android
       
       - name: Get Dependencies
         working-directory: ./client
@@ -30,23 +33,23 @@ jobs:
         
       - name: Build APK
         working-directory: ./client
-        run: flutter build apk --release --verbose
+        run: flutter build apk --release
         
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: ./client/build/app/outputs/flutter-apk/release/app-release.apk
+          name: ebox-android
+          path: client/build/app/outputs/flutter-apk/release/app-release.apk
           retention-days: 7
 
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     
     steps:
       - uses: actions/checkout@v4
       
-      - uses: subosito/flutter-action@v3
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.16.0'
           channel: 'stable'
@@ -60,7 +63,7 @@ jobs:
         
       - name: Build Windows
         working-directory: ./client
-        run: flutter build windows --release --verbose
+        run: flutter build windows --release
         
       - name: Create ZIP
         shell: pwsh
@@ -72,7 +75,7 @@ jobs:
       - name: Upload Windows
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-windows
+          name: ebox-windows
           path: dist/ebox-windows.zip
           retention-days: 7
 
@@ -86,22 +89,22 @@ jobs:
       - name: Download APK
         uses: actions/download-artifact@v4
         with:
-          name: app-release-apk
-          path: ./artifacts/apk
+          name: ebox-android
+          path: ./artifacts/android
           
       - name: Download Windows
         uses: actions/download-artifact@v4
         with:
-          name: app-release-windows
+          name: ebox-windows
           path: ./artifacts/windows
           
       - name: List Files
-        run: ls -la ./artifacts/apk ./artifacts/windows
+        run: ls -la ./artifacts/android ./artifacts/windows
         
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
-          name: E 宝盒 ${{ github.ref_name }}
+          name: E 宝盒 v5.0.8
           body: |
             ## ✨ 功能特性
             - Hills 风格 UI
@@ -114,7 +117,7 @@ jobs:
             - Android: app-release.apk
             - Windows: ebox-windows.zip
           files: |
-            ./artifacts/apk/app-release.apk
+            ./artifacts/android/app-release.apk
             ./artifacts/windows/ebox-windows.zip
           draft: true
         env:
