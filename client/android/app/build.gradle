@@ -1,0 +1,23 @@
+plugins {
+    id "com.android.application"
+    id "flutter"
+}
+
+android {
+    namespace "com.ebox.ebox"
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.ebox.ebox"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.1"
+    }
+    buildTypes {
+        release { signingConfig signingConfigs.debug }
+    }
+}
+
+flutter {
+    source '../..'
+}
