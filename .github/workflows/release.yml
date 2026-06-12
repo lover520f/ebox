@@ -20,7 +20,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
-      - run: cd client && flutter pub get && flutter build apk --release
+          channel: 'stable'
+      - run: cd client && flutter pub get
+      - run: cd client && flutter build apk --release --verbose
       - uses: actions/upload-artifact@v4
         with:
           name: android
@@ -33,7 +35,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
-      - run: cd client && flutter pub get && flutter build windows --release
+          channel: 'stable'
+      - run: cd client && flutter pub get
+      - run: cd client && flutter build windows --release --verbose
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -64,13 +68,6 @@ jobs:
             ### Android
             - 下载 app-release.apk
             - 允许未知来源安装
-            
-            ### 功能
-            - Hills 风格 UI (紫色 -蓝色渐变)
-            - Emby 客户端
-            - 电影/剧集浏览
-            - 视频播放
-            - 收藏管理
             
             ⚠️ AI 测试版本
           files: |
